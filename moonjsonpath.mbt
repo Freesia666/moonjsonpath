@@ -211,13 +211,25 @@ fn parse_array_index(token : String) -> Int? {
     return None
   }
   let mut value = 0
-  for ch in token {
+  let chars = token.to_array()
+  let mut i = 0
+  let mut sign = 1
+  if chars[0] == '-' {
+    sign = -1
+    i = 1
+  }
+  if i >= chars.length() {
+    return None
+  }
+  while i < chars.length() {
+    let ch = chars[i]
     if ch < '0' || ch > '9' {
       return None
     }
     value = value * 10 + ch.to_int() - '0'.to_int()
+    i += 1
   }
-  Some(value)
+  Some(value * sign)
 }
 
 ///|
@@ -378,7 +390,7 @@ pub(all) enum PathSegment {
   Element(Int)
   Wildcard
   RecursiveMember(String)
-  Slice(Int?, Int?)
+  Slice(Int?, Int?, Int?)
   Filter(FilterExpr)
   Union(Array[PathSegment])
 } derive(Eq, Debug)
@@ -503,7 +515,7 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
           }
         } else if selector.contains(":") {
           match parse_slice_selector(selector) {
-            Some((start, end)) => segments.push(Slice(start, end))
+            Some((start, end, step)) => segments.push(Slice(start, end, step))
             None =>
               return Err(
                 path_error(start, "slice bounds must be non-negative integers"),
@@ -574,8 +586,9 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
               None => ()
             }
           }
-        Element(index) =>
+        Element(raw_index) =>
           if item.value is Array(array) {
+            let index = resolve_index(raw_index, array.length())
             match array.get(index) {
               Some(value) =>
                 next.push({
@@ -605,18 +618,9 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
           }
         RecursiveMember(key) =>
           collect_recursive_member(item.value, item.pointer, key, next)
-        Slice(start, end) =>
+        Slice(start, end, step) =>
           if item.value is Array(array) {
-            let lo = clamp_index(start.unwrap_or(0), array.length())
-            let hi = clamp_index(end.unwrap_or(array.length()), array.length())
-            if lo < hi {
-              for i = lo; i < hi; i = i + 1 {
-                next.push({
-                  value: array[i],
-                  pointer: { parts: [..item.pointer.parts, i.to_string()] },
-                })
-              }
-            }
+            append_slice_matches(item.pointer, array, start, end, step, next)
           }
         Filter(filter) =>
           if item.value is Array(array) {
@@ -687,8 +691,9 @@ fn append_segment_matches(
           None => ()
         }
       }
-    Element(index) =>
+    Element(raw_index) =>
       if item.value is Array(array) {
+        let index = resolve_index(raw_index, array.length())
         match array.get(index) {
           Some(value) =>
             next.push({
@@ -832,7 +837,7 @@ fn write_path_segment(out : StringBuilder, segment : PathSegment) -> Unit {
         write_quoted_selector(out, key)
       }
     }
-    Slice(start, end) => {
+    Slice(start, end, step) => {
       out.write_char('[')
       match start {
         Some(start) => out.write_object(start)
@@ -841,6 +846,13 @@ fn write_path_segment(out : StringBuilder, segment : PathSegment) -> Unit {
       out.write_char(':')
       match end {
         Some(end) => out.write_object(end)
+        None => ()
+      }
+      match step {
+        Some(step) => {
+          out.write_char(':')
+          out.write_object(step)
+        }
         None => ()
       }
       out.write_char(']')
@@ -1001,22 +1013,28 @@ fn write_literal(out : StringBuilder, literal : Literal) -> Unit {
 }
 
 ///|
-fn parse_slice_selector(selector : String) -> (Int?, Int?)? {
+fn parse_slice_selector(selector : String) -> (Int?, Int?, Int?)? {
   let chars = selector.to_array()
-  let mut colon = -1
+  let colons : Array[Int] = []
   for i, ch in chars {
     if ch == ':' {
-      if colon >= 0 {
-        return None
-      }
-      colon = i
+      colons.push(i)
     }
   }
-  if colon < 0 {
+  if colons.length() == 0 || colons.length() > 2 {
     return None
   }
-  let left = String::from_array(chars[0:colon])
-  let right = String::from_array(chars[colon + 1:chars.length()])
+  let first = colons[0]
+  let second = if colons.length() == 2 { Some(colons[1]) } else { None }
+  let left = String::from_array(chars[0:first])
+  let right = match second {
+    Some(second) => String::from_array(chars[first + 1:second])
+    None => String::from_array(chars[first + 1:chars.length()])
+  }
+  let step_text = match second {
+    Some(second) => String::from_array(chars[second + 1:chars.length()])
+    None => ""
+  }
   let start = if left == "" {
     Some(None)
   } else {
@@ -1027,8 +1045,13 @@ fn parse_slice_selector(selector : String) -> (Int?, Int?)? {
   } else {
     parse_array_index(right).map(i => Some(i))
   }
-  match (start, end) {
-    (Some(start), Some(end)) => Some((start, end))
+  let step = if step_text == "" {
+    Some(None)
+  } else {
+    parse_array_index(step_text).map(i => Some(i))
+  }
+  match (start, end, step) {
+    (Some(start), Some(end), Some(step)) => Some((start, end, step))
     _ => None
   }
 }
@@ -1041,6 +1064,79 @@ fn clamp_index(index : Int, len : Int) -> Int {
     len
   } else {
     index
+  }
+}
+
+///|
+fn resolve_index(index : Int, len : Int) -> Int {
+  if index < 0 {
+    len + index
+  } else {
+    index
+  }
+}
+
+///|
+fn append_slice_matches(
+  pointer : Pointer,
+  array : Array[Json],
+  start : Int?,
+  end : Int?,
+  step : Int?,
+  next : Array[PathMatch],
+) -> Unit {
+  let stride = step.unwrap_or(1)
+  if stride == 0 {
+    return
+  }
+  let len = array.length()
+  if len == 0 {
+    return
+  }
+  if stride > 0 {
+    let lo = clamp_slice_bound(start.unwrap_or(0), len)
+    let hi = clamp_slice_bound(end.unwrap_or(len), len)
+    let mut i = lo
+    while i < hi {
+      next.push({
+        value: array[i],
+        pointer: { parts: [..pointer.parts, i.to_string()] },
+      })
+      i += stride
+    }
+  } else {
+    let lo = clamp_slice_bound(start.unwrap_or(len - 1), len)
+    let hi = match end {
+      Some(end) => clamp_reverse_end(end, len)
+      None => -1
+    }
+    let mut i = lo
+    while i > hi {
+      if i >= 0 && i < len {
+        next.push({
+          value: array[i],
+          pointer: { parts: [..pointer.parts, i.to_string()] },
+        })
+      }
+      i += stride
+    }
+  }
+}
+
+///|
+fn clamp_slice_bound(index : Int, len : Int) -> Int {
+  clamp_index(resolve_index(index, len), len)
+}
+
+///|
+fn clamp_reverse_end(index : Int, len : Int) -> Int {
+  let resolved = resolve_index(index, len)
+  if resolved < -1 {
+    -1
+  } else if resolved >= len {
+    len - 1
+  } else {
+    resolved
   }
 }
 

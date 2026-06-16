@@ -481,3 +481,29 @@ test "diagnostic helpers describe parse and pointer errors" {
     content="invalid JSON Pointer at /users/3: array index is out of bounds",
   )
 }
+
+///|
+test "jsonpath supports negative indexes and stepped slices" {
+  let doc : Json = { "items": ["zero", "one", "two", "three", "four"] }
+
+  let last = @moonjsonpath.Path::compile("$.items[-1]").unwrap().query(doc)
+  @json.json_inspect(last.map(item => item.value), content=["four"])
+  inspect(last[0].pointer.to_string(), content="/items/4")
+
+  let evens = @moonjsonpath.Path::compile("$.items[::2]").unwrap().query(doc)
+  @json.json_inspect(evens.map(item => item.value), content=[
+    "zero", "two", "four",
+  ])
+
+  let reverse = @moonjsonpath.Path::compile("$.items[::-1]").unwrap().query(doc)
+  @json.json_inspect(reverse.map(item => item.value), content=[
+    "four", "three", "two", "one", "zero",
+  ])
+
+  let middle_reverse = @moonjsonpath.Path::compile("$.items[3:0:-1]")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(middle_reverse.map(item => item.value), content=[
+    "three", "two", "one",
+  ])
+}
