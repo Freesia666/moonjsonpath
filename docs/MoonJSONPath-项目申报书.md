@@ -13,12 +13,14 @@ MoonJSONPath 面向 MoonBit 工具链、配置处理、API 客户端、测试 fi
 **核心功能范围**
 
 - 支持 JSON Pointer 解析、RFC 6901 转义、格式化、`get`、`set`、`remove`。
-- 支持 JSONPath 核心子集：根选择 `$`、成员访问、数组索引、通配符、递归成员查询、数组切片和简单过滤表达式。
+- 支持 JSONPath 核心子集：根选择 `$`、成员访问、quoted member selector、数组索引、union selector、通配符、递归成员查询、数组切片和过滤表达式。
 - 查询结果同时返回匹配 JSON 值和对应 Pointer 路径。
-- 提供 `query_json_text` 文本入口，用于解析 JSON 字符串并输出查询结果。
+- 提供 `query_json_text`、`query_json_file` 和带输出选项的查询入口，用于解析 JSON 字符串或文件并输出查询结果。
+- 支持 values、pointers、matches 三种输出模式，matches 模式返回 `{ path, value }` 结构，适合诊断和工具链集成。
+- 提供 Path canonical formatter 和错误诊断文本，方便 CLI、测试和文档展示。
 - 提供 `cmd/main` 可运行示例、README 示例和测试用例。
 - 使用 CI 执行 `moon check` 与 `moon test`。
 
 **预期交付**
 
-项目将交付一个可发布到 mooncakes.io 的 MoonBit 库、一个可运行 demo、完整 README、Apache-2.0 许可证、核心测试和 GitHub/Gitlink 同步仓库。远期可扩展方向包括更完整的 RFC 9535 过滤表达式、CLI 文件/stdin 输入、JSON Patch 互操作和更多 conformance 测试。
+项目将交付一个可发布到 mooncakes.io 的 MoonBit 库、一个可运行文件输入 CLI、完整 README、Apache-2.0 许可证、核心测试和 GitHub/Gitlink 同步仓库。远期可扩展方向包括完整 RFC 9535 negative index / step slice / 正则谓词、stdin 读取适配、JSON Patch 互操作和更多 conformance 测试。

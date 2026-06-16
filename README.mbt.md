@@ -11,13 +11,16 @@ hand-written recursive traversal code.
 - JSONPath core query subset:
   - root selector `$`
   - dot members: `$.users`
+  - quoted members: `$['space key']`, `$['a/b']`
   - array indexes: `$.users[0]`
+  - union selectors: `$.users[0,2]`, `$.meta['source','count']`
   - wildcards: `$.users[*]`, `$.meta.*`
   - recursive member descent: `$..name`
   - positive array slices: `$.items[1:4]`, `$.items[:2]`, `$.items[3:]`
-  - simple filters: `$.users[?(@.age > 20)]`
+  - filters: `$.users[?(@.age > 20)]`, `?(@.isbn)`, `?(@.a == 1 && @.b)`
 - Match results include both the matched JSON value and its JSON Pointer path.
-- Text helper for parsing JSON input and serializing query results.
+- Text and file helpers for parsing JSON input and serializing query results.
+- CLI output modes for values, pointers, and `{ path, value }` match objects.
 
 ## Quick Start
 
@@ -45,17 +48,23 @@ test {
 }
 ```
 
-The demo command can be run from the project root:
+The command can be run from the project root:
 
 ```bash
-moon run cmd/main
+moon run cmd/main -- '$.users[*].name' data.json
+moon run cmd/main -- --pointers '$..name' data.json
+moon run cmd/main -- --matches --pretty '$.users[?(@.age > 20)]' data.json
 ```
 
-It prints:
+For a file containing two users named Ada and Grace, the first command prints:
 
 ```json
-["Grace"]
+["Ada","Grace"]
 ```
+
+File input is supported through `moonbitlang/x/fs`. Direct stdin reading is not
+exposed by the MoonBit packages used here yet, so stdin piping is documented as
+a future CLI adapter task rather than claimed as complete.
 
 ## Scope
 
@@ -64,6 +73,13 @@ processing language with functions, pipes, object construction, reductions, and
 many transformation operators. MoonJSONPath focuses on a compact, testable query
 and location layer suitable for MoonBit tools, config processors, API clients,
 and LLM/tool-call workflows.
+
+## Current Non-goals
+
+- Full `jq` compatibility.
+- Script expressions, arithmetic expressions, or user-defined functions inside filters.
+- Full RFC 9535 negative indexes, steps, or regular-expression predicates.
+- Direct stdin reading until the MoonBit standard/x packages expose a stable API.
 
 ## Contest Notes
 
