@@ -139,3 +139,18 @@ test "jsonpath recursive descent finds nested object members" {
     "Grace",
   ])
 }
+
+///|
+test "jsonpath slice selects array ranges" {
+  let doc : Json = { "items": ["zero", "one", "two", "three", "four"] }
+  let middle = @moonjsonpath.Path::compile("$.items[1:4]").unwrap().query(doc)
+  inspect(middle.length(), content="3")
+  @json.json_inspect(middle.map(item => item.value), content=["one", "two", "three"])
+  inspect(middle[0].pointer.to_string(), content="/items/1")
+
+  let first_two = @moonjsonpath.Path::compile("$.items[:2]").unwrap().query(doc)
+  @json.json_inspect(first_two.map(item => item.value), content=["zero", "one"])
+
+  let tail = @moonjsonpath.Path::compile("$.items[3:]").unwrap().query(doc)
+  @json.json_inspect(tail.map(item => item.value), content=["three", "four"])
+}

@@ -279,6 +279,7 @@ pub(all) enum PathSegment {
   Element(Int)
   Wildcard
   RecursiveMember(String)
+  Slice(Int?, Int?)
 } derive(Eq, Debug)
 
 ///|
@@ -356,6 +357,11 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
         let selector = String::from_array(chars[start:end])
         if selector == "*" {
           segments.push(Wildcard)
+        } else if selector.contains(":") {
+          match parse_slice_selector(selector) {
+            Some((start, end)) => segments.push(Slice(start, end))
+            None => return Err(path_error(start, "slice bounds must be non-negative integers"))
+          }
         } else {
           match parse_array_index(selector) {
             Some(index) => segments.push(Element(index))
@@ -418,6 +424,19 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
         RecursiveMember(key) => {
           collect_recursive_member(item.value, item.pointer, key, next)
         }
+        Slice(start, end) =>
+          if item.value is Array(array) {
+            let lo = clamp_index(start.unwrap_or(0), array.length())
+            let hi = clamp_index(end.unwrap_or(array.length()), array.length())
+            if lo < hi {
+              for i = lo; i < hi; i = i + 1 {
+                next.push({
+                  value: array[i],
+                  pointer: { parts: [..item.pointer.parts, i.to_string()] },
+                })
+              }
+            }
+          }
       }
     }
     current = next
@@ -428,6 +447,42 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
 ///|
 fn path_error(position : Int, message : String) -> PathError {
   { position, message }
+}
+
+///|
+fn parse_slice_selector(selector : String) -> (Int?, Int?)? {
+  let chars = selector.to_array()
+  let mut colon = -1
+  for i, ch in chars {
+    if ch == ':' {
+      if colon >= 0 {
+        return None
+      }
+      colon = i
+    }
+  }
+  if colon < 0 {
+    return None
+  }
+  let left = String::from_array(chars[0:colon])
+  let right = String::from_array(chars[colon + 1:chars.length()])
+  let start = if left == "" { Some(None) } else { parse_array_index(left).map(i => Some(i)) }
+  let end = if right == "" { Some(None) } else { parse_array_index(right).map(i => Some(i)) }
+  match (start, end) {
+    (Some(start), Some(end)) => Some((start, end))
+    _ => None
+  }
+}
+
+///|
+fn clamp_index(index : Int, len : Int) -> Int {
+  if index < 0 {
+    0
+  } else if index > len {
+    len
+  } else {
+    index
+  }
 }
 
 ///|
