@@ -277,6 +277,7 @@ fn remove_at(
 pub(all) enum PathSegment {
   Member(String)
   Element(Int)
+  Wildcard
 } derive(Eq, Debug)
 
 ///|
@@ -311,6 +312,11 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
           return Err(path_error(i, "member name expected after '.'"))
         }
         let start = i + 1
+        if chars[start] == '*' {
+          segments.push(Wildcard)
+          i = start + 1
+          continue
+        }
         let mut end = start
         while end < chars.length() && chars[end] != '.' && chars[end] != '[' {
           end += 1
@@ -330,9 +336,14 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
         if end >= chars.length() {
           return Err(path_error(i, "missing closing ']'"))
         }
-        match parse_array_index(String::from_array(chars[start:end])) {
-          Some(index) => segments.push(Element(index))
-          None => return Err(path_error(start, "array index must be a non-negative integer"))
+        let selector = String::from_array(chars[start:end])
+        if selector == "*" {
+          segments.push(Wildcard)
+        } else {
+          match parse_array_index(selector) {
+            Some(index) => segments.push(Element(index))
+            None => return Err(path_error(start, "array index must be a non-negative integer"))
+          }
         }
         i = end + 1
       }
@@ -368,6 +379,24 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
               })
               None => ()
             }
+          }
+        Wildcard =>
+          match item.value {
+            Array(array) =>
+              for index, value in array {
+                next.push({
+                  value,
+                  pointer: { parts: [..item.pointer.parts, index.to_string()] },
+                })
+              }
+            Object(object) =>
+              for key, value in object {
+                next.push({
+                  value,
+                  pointer: { parts: [..item.pointer.parts, key] },
+                })
+              }
+            _ => ()
           }
       }
     }

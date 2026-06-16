@@ -97,3 +97,23 @@ test "jsonpath reports syntax errors with byte position" {
   inspect(path is Err(_), content="true")
   inspect(path.unwrap_err().position, content="0")
 }
+
+///|
+test "jsonpath wildcard selects array elements and object members" {
+  let doc : Json = {
+    "users": [
+      { "name": "Ada" },
+      { "name": "Grace" },
+      { "name": "Katherine" },
+    ],
+    "meta": { "count": 3, "source": "fixture" },
+  }
+  let names = @moonjsonpath.Path::compile("$.users[*].name").unwrap().query(doc)
+  inspect(names.length(), content="3")
+  inspect(names[0].pointer.to_string(), content="/users/0/name")
+  inspect(names[2].pointer.to_string(), content="/users/2/name")
+  @json.json_inspect(names.map(item => item.value), content=["Ada", "Grace", "Katherine"])
+
+  let meta = @moonjsonpath.Path::compile("$.meta.*").unwrap().query(doc)
+  inspect(meta.length(), content="2")
+}
