@@ -1,9 +1,16 @@
 ///|
 fn main {
-  let demo_json = "{\"users\":[{\"name\":\"Ada\",\"age\":36},{\"name\":\"Grace\",\"age\":85}]}"
-  match
-    @moonjsonpath.query_json_text("$.users[?(@.age > 40)].name", demo_json) {
-    Ok(output) => println(output)
-    Err(message) => println("MoonJSONPath error: \{message}")
+  let args = @sys.get_cli_args()
+  if args.length() == 3 {
+    match @moonjsonpath.query_json_file(args[1], args[2]) {
+      Ok(output) => println(output)
+      Err(message) => {
+        println("MoonJSONPath error: \{message}")
+        @sys.exit(1)
+      }
+    }
+  } else {
+    println("Usage: moonjsonpath <jsonpath> <file>")
+    println("Example: moonjsonpath '$.users[*].name' data.json")
   }
 }

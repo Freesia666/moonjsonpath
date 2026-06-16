@@ -1101,6 +1101,17 @@ pub fn query_json_text(
 }
 
 ///|
+pub fn query_json_file(
+  path_text : String,
+  file_path : String,
+) -> Result[String, String] {
+  let json_text = @fs.read_file_to_string(file_path) catch {
+    _ => return Err("failed to read JSON file '\{file_path}'")
+  }
+  query_json_text(path_text, json_text)
+}
+
+///|
 fn collect_recursive_member(
   value : Json,
   pointer : Pointer,

@@ -317,3 +317,27 @@ test "jsonpath filters support existence nested fields decimals and conjunctions
     .query(doc)
   @json.json_inspect(debt.map(item => item.value), content=["Draft"])
 }
+
+///|
+test "query_json_file reads JSON documents from disk" {
+  let dir = "tmp_moonjsonpath_cli"
+  if @fs.path_exists(dir) {
+    @fs.remove_file("\{dir}/data.json") catch {
+      _ => ()
+    }
+    @fs.remove_dir(dir) catch {
+      _ => ()
+    }
+  }
+  @fs.create_dir(dir)
+  let path = "\{dir}/data.json"
+  @fs.write_string_to_file(
+    path,
+    "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}",
+  )
+  let output = @moonjsonpath.query_json_file("$.users[*].name", path)
+  inspect(output is Ok(_), content="true")
+  inspect(output.unwrap(), content="[\"Ada\",\"Grace\"]")
+  @fs.remove_file(path)
+  @fs.remove_dir(dir)
+}

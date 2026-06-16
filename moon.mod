@@ -22,3 +22,7 @@ license = "Apache-2.0"
 keywords = [ "jsonpath", "json-pointer", "json", "query", "moonbit" ]
 
 description = "JSON Pointer and JSONPath query utilities for MoonBit"
+
+import {
+  "moonbitlang/x@0.4.45",
+}
