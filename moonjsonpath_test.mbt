@@ -154,3 +154,22 @@ test "jsonpath slice selects array ranges" {
   let tail = @moonjsonpath.Path::compile("$.items[3:]").unwrap().query(doc)
   @json.json_inspect(tail.map(item => item.value), content=["three", "four"])
 }
+
+///|
+test "jsonpath filters arrays with simple comparisons" {
+  let doc : Json = {
+    "users": [
+      { "name": "Ada", "age": 36, "active": true },
+      { "name": "Grace", "age": 85, "active": false },
+      { "name": "Katherine", "age": 18, "active": true },
+    ],
+  }
+  let adults = @moonjsonpath.Path::compile("$.users[?(@.age > 20)].name").unwrap().query(doc)
+  @json.json_inspect(adults.map(item => item.value), content=["Ada", "Grace"])
+
+  let active = @moonjsonpath.Path::compile("$.users[?(@.active == true)].name").unwrap().query(doc)
+  @json.json_inspect(active.map(item => item.value), content=["Ada", "Katherine"])
+
+  let named = @moonjsonpath.Path::compile("$.users[?(@.name == \"Grace\")].age").unwrap().query(doc)
+  @json.json_inspect(named.map(item => item.value), content=[85])
+}

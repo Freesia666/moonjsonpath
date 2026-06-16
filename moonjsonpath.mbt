@@ -280,6 +280,32 @@ pub(all) enum PathSegment {
   Wildcard
   RecursiveMember(String)
   Slice(Int?, Int?)
+  Filter(FilterExpr)
+} derive(Eq, Debug)
+
+///|
+pub(all) enum CompareOp {
+  Eq
+  Ne
+  Gt
+  Ge
+  Lt
+  Le
+} derive(Eq, Debug)
+
+///|
+pub(all) enum Literal {
+  LString(String)
+  LNumber(Double)
+  LBool(Bool)
+  LNull
+} derive(Eq, Debug)
+
+///|
+pub(all) struct FilterExpr {
+  field : String
+  op : CompareOp
+  literal : Literal
 } derive(Eq, Debug)
 
 ///|
@@ -357,6 +383,12 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
         let selector = String::from_array(chars[start:end])
         if selector == "*" {
           segments.push(Wildcard)
+        } else if selector.has_prefix("?(") && selector.has_suffix(")") {
+          let expr = selector[2:selector.length() - 1].to_owned()
+          match parse_filter_expr(expr) {
+            Some(filter) => segments.push(Filter(filter))
+            None => return Err(path_error(start, "filter must look like @.field <op> literal"))
+          }
         } else if selector.contains(":") {
           match parse_slice_selector(selector) {
             Some((start, end)) => segments.push(Slice(start, end))
@@ -437,6 +469,17 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
               }
             }
           }
+        Filter(filter) =>
+          if item.value is Array(array) {
+            for index, value in array {
+              if filter_matches(value, filter) {
+                next.push({
+                  value,
+                  pointer: { parts: [..item.pointer.parts, index.to_string()] },
+                })
+              }
+            }
+          }
       }
     }
     current = next
@@ -482,6 +525,179 @@ fn clamp_index(index : Int, len : Int) -> Int {
     len
   } else {
     index
+  }
+}
+
+///|
+fn parse_filter_expr(expr : String) -> FilterExpr? {
+  let ops : Array[(String, CompareOp)] = [
+    ("==", Eq),
+    ("!=", Ne),
+    (">=", Ge),
+    ("<=", Le),
+    (">", Gt),
+    ("<", Lt),
+  ]
+  for pair in ops {
+    let (op_text, op) = pair
+    match find_operator(expr, op_text) {
+      Some(pos) => {
+        let left = trim_ascii(expr[:pos].to_owned())
+        let right = trim_ascii(expr[pos + op_text.length():].to_owned())
+        if !left.has_prefix("@.") || left.length() <= 2 {
+          return None
+        }
+        let field = left[2:].to_owned()
+        match parse_literal(right) {
+          Some(literal) => return Some({ field, op, literal })
+          None => return None
+        }
+      }
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+fn find_operator(input : String, op : String) -> Int? {
+  let chars = input.to_array()
+  let target = op.to_array()
+  if target.length() == 0 || target.length() > chars.length() {
+    return None
+  }
+  for i = 0; i <= chars.length() - target.length(); i = i + 1 {
+    let mut same = true
+    for j = 0; j < target.length(); j = j + 1 {
+      if chars[i + j] != target[j] {
+        same = false
+      }
+    }
+    if same {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+fn parse_literal(input : String) -> Literal? {
+  if input == "true" {
+    return Some(LBool(true))
+  }
+  if input == "false" {
+    return Some(LBool(false))
+  }
+  if input == "null" {
+    return Some(LNull)
+  }
+  if input.length() >= 2 && input.has_prefix("\"") && input.has_suffix("\"") {
+    return Some(LString(input[1:input.length() - 1].to_owned()))
+  }
+  match parse_number(input) {
+    Some(n) => Some(LNumber(n.to_double()))
+    None => None
+  }
+}
+
+///|
+fn parse_number(input : String) -> Int? {
+  if input == "" {
+    return None
+  }
+  let mut value = 0
+  let mut i = 0
+  let chars = input.to_array()
+  let mut sign = 1
+  if chars[0] == '-' {
+    sign = -1
+    i = 1
+  }
+  if i >= chars.length() {
+    return None
+  }
+  while i < chars.length() {
+    let ch = chars[i]
+    if ch < '0' || ch > '9' {
+      return None
+    }
+    value = value * 10 + ch.to_int() - '0'.to_int()
+    i += 1
+  }
+  Some(value * sign)
+}
+
+///|
+fn trim_ascii(input : String) -> String {
+  let chars = input.to_array()
+  let mut start = 0
+  let mut end = chars.length()
+  while start < end && is_ascii_space(chars[start]) {
+    start += 1
+  }
+  while end > start && is_ascii_space(chars[end - 1]) {
+    end -= 1
+  }
+  String::from_array(chars[start:end])
+}
+
+///|
+fn is_ascii_space(ch : Char) -> Bool {
+  ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'
+}
+
+///|
+fn filter_matches(value : Json, filter : FilterExpr) -> Bool {
+  match value {
+    Object(object) =>
+      match object.get(filter.field) {
+        Some(field_value) => compare_json_literal(field_value, filter.op, filter.literal)
+        None => false
+      }
+    _ => false
+  }
+}
+
+///|
+fn compare_json_literal(value : Json, op : CompareOp, literal : Literal) -> Bool {
+  match (value, literal) {
+    (String(actual), LString(expected)) => compare_string(actual, op, expected)
+    (Number(actual, ..), LNumber(expected)) => compare_double(actual, op, expected)
+    (True, LBool(expected)) => compare_bool(true, op, expected)
+    (False, LBool(expected)) => compare_bool(false, op, expected)
+    (Null, LNull) => op == Eq
+    (Null, _) => op == Ne
+    _ => false
+  }
+}
+
+///|
+fn compare_string(left : String, op : CompareOp, right : String) -> Bool {
+  match op {
+    Eq => left == right
+    Ne => left != right
+    Gt | Ge | Lt | Le => false
+  }
+}
+
+///|
+fn compare_bool(left : Bool, op : CompareOp, right : Bool) -> Bool {
+  match op {
+    Eq => left == right
+    Ne => left != right
+    Gt | Ge | Lt | Le => false
+  }
+}
+
+///|
+fn compare_double(left : Double, op : CompareOp, right : Double) -> Bool {
+  match op {
+    Eq => left == right
+    Ne => left != right
+    Gt => left > right
+    Ge => left >= right
+    Lt => left < right
+    Le => left <= right
   }
 }
 
