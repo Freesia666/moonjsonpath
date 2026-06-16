@@ -1,7 +1,8 @@
 ///|
-/// Entry point for the CLI or runnable program in this template.
-/// Keep main focused; move logic into the library package.
-/// Run with `moon run cmd/main` from the project root.
 fn main {
-  println("Hello")
+  let demo_json = "{\"users\":[{\"name\":\"Ada\",\"age\":36},{\"name\":\"Grace\",\"age\":85}]}"
+  match @moonjsonpath.query_json_text("$.users[?(@.age > 40)].name", demo_json) {
+    Ok(output) => println(output)
+    Err(message) => println("MoonJSONPath error: \{message}")
+  }
 }

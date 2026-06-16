@@ -702,6 +702,21 @@ fn compare_double(left : Double, op : CompareOp, right : Double) -> Bool {
 }
 
 ///|
+pub fn query_json_text(path_text : String, json_text : String) -> Result[String, String] {
+  let path = match Path::compile(path_text) {
+    Ok(path) => path
+    Err(err) => return Err("invalid JSONPath at \{err.position}: \{err.message}")
+  }
+  let doc = try {
+    @json.parse(json_text)
+  } catch {
+    err => return Err("invalid JSON input: \{err}")
+  }
+  let values = path.query(doc).map(item => item.value)
+  Ok(Json::array(values).stringify())
+}
+
+///|
 fn collect_recursive_member(
   value : Json,
   pointer : Pointer,

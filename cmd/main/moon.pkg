@@ -1,6 +1,6 @@
-// import {
-//   "RunnerQuan/moonjsonpath" @lib,
-// }
+import {
+  "RunnerQuan/moonjsonpath"
+}
 
 options(
   "is-main": true,

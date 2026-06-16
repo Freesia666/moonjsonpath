@@ -173,3 +173,16 @@ test "jsonpath filters arrays with simple comparisons" {
   let named = @moonjsonpath.Path::compile("$.users[?(@.name == \"Grace\")].age").unwrap().query(doc)
   @json.json_inspect(named.map(item => item.value), content=[85])
 }
+
+///|
+test "query_json_text parses JSON and serializes matches" {
+  let output = @moonjsonpath.query_json_text(
+    "$.users[*].name",
+    "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}",
+  )
+  inspect(output is Ok(_), content="true")
+  inspect(output.unwrap(), content="[\"Ada\",\"Grace\"]")
+
+  let bad = @moonjsonpath.query_json_text("users", "{}")
+  inspect(bad is Err(_), content="true")
+}
