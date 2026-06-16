@@ -341,3 +341,68 @@ test "query_json_file reads JSON documents from disk" {
   @fs.remove_file(path)
   @fs.remove_dir(dir)
 }
+
+///|
+test "query options serialize values pointers and match objects" {
+  let json = "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}"
+  let path = "$.users[*].name"
+
+  let values = @moonjsonpath.query_json_text_with_options(
+    path,
+    json,
+    @moonjsonpath.QueryOptions::values(),
+  )
+  inspect(values.unwrap(), content="[\"Ada\",\"Grace\"]")
+
+  let pointers = @moonjsonpath.query_json_text_with_options(
+    path,
+    json,
+    @moonjsonpath.QueryOptions::pointers(),
+  )
+  inspect(pointers.unwrap(), content="[\"/users/0/name\",\"/users/1/name\"]")
+
+  let matches = @moonjsonpath.query_json_text_with_options(
+    path,
+    json,
+    @moonjsonpath.QueryOptions::matches(indent=2),
+  )
+  inspect(
+    matches.unwrap(),
+    content=(
+      #|[
+      #|  {
+      #|    "path": "/users/0/name",
+      #|    "value": "Ada"
+      #|  },
+      #|  {
+      #|    "path": "/users/1/name",
+      #|    "value": "Grace"
+      #|  }
+      #|]
+    ),
+  )
+}
+
+///|
+test "cli args parse output modes and input files" {
+  let parsed = @moonjsonpath.CliConfig::parse([
+    "moonjsonpath",
+    "--matches",
+    "--pretty",
+    "$.users[*].name",
+    "data.json",
+  ])
+  inspect(parsed is Ok(_), content="true")
+  let config = parsed.unwrap()
+  inspect(config.path_text, content="$.users[*].name")
+  inspect(config.file_path, content="data.json")
+  inspect(config.options.output is @moonjsonpath.OutputMode::Matches, content="true")
+  inspect(config.options.indent, content="2")
+
+  let help = @moonjsonpath.CliConfig::parse(["moonjsonpath", "--help"])
+  inspect(help is Ok(_), content="true")
+  inspect(help.unwrap().show_help, content="true")
+
+  let bad = @moonjsonpath.CliConfig::parse(["moonjsonpath", "--unknown"])
+  inspect(bad is Err(_), content="true")
+}

@@ -1088,6 +1088,43 @@ pub fn query_json_text(
   path_text : String,
   json_text : String,
 ) -> Result[String, String] {
+  query_json_text_with_options(path_text, json_text, QueryOptions::values())
+}
+
+///|
+pub(all) enum OutputMode {
+  Values
+  Pointers
+  Matches
+} derive(Eq, Debug)
+
+///|
+pub(all) struct QueryOptions {
+  output : OutputMode
+  indent : Int
+} derive(Eq, Debug)
+
+///|
+pub fn QueryOptions::values(indent? : Int = 0) -> QueryOptions {
+  { output: Values, indent }
+}
+
+///|
+pub fn QueryOptions::pointers(indent? : Int = 0) -> QueryOptions {
+  { output: Pointers, indent }
+}
+
+///|
+pub fn QueryOptions::matches(indent? : Int = 0) -> QueryOptions {
+  { output: Matches, indent }
+}
+
+///|
+pub fn query_json_text_with_options(
+  path_text : String,
+  json_text : String,
+  options : QueryOptions,
+) -> Result[String, String] {
   let path = match Path::compile(path_text) {
     Ok(path) => path
     Err(err) =>
@@ -1096,8 +1133,8 @@ pub fn query_json_text(
   let doc = @json.parse(json_text) catch {
     err => return Err("invalid JSON input: \{err}")
   }
-  let values = path.query(doc).map(item => item.value)
-  Ok(Json::array(values).stringify())
+  let matches = path.query(doc)
+  Ok(render_matches(matches, options))
 }
 
 ///|
@@ -1105,10 +1142,147 @@ pub fn query_json_file(
   path_text : String,
   file_path : String,
 ) -> Result[String, String] {
+  query_json_file_with_options(path_text, file_path, QueryOptions::values())
+}
+
+///|
+pub fn query_json_file_with_options(
+  path_text : String,
+  file_path : String,
+  options : QueryOptions,
+) -> Result[String, String] {
   let json_text = @fs.read_file_to_string(file_path) catch {
     _ => return Err("failed to read JSON file '\{file_path}'")
   }
-  query_json_text(path_text, json_text)
+  query_json_text_with_options(path_text, json_text, options)
+}
+
+///|
+fn render_matches(matches : Array[PathMatch], options : QueryOptions) -> String {
+  let json = match options.output {
+    Values => Json::array(matches.map(item => item.value))
+    Pointers => Json::array(matches.map(item => item.pointer.to_string().to_json()))
+    Matches =>
+      Json::array(
+        matches.map(item => {
+          {
+            "path": item.pointer.to_string(),
+            "value": item.value,
+          }
+        }),
+      )
+  }
+  json.stringify(indent=options.indent)
+}
+
+///|
+pub(all) struct CliConfig {
+  path_text : String
+  file_path : String
+  options : QueryOptions
+  show_help : Bool
+} derive(Eq, Debug)
+
+///|
+pub fn CliConfig::parse(args : Array[String]) -> Result[CliConfig, String] {
+  let mut output = Values
+  let mut indent = 0
+  let mut show_help = false
+  let positional : Array[String] = []
+  let mut i = 1
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--help" | "-h" => {
+        show_help = true
+        i += 1
+      }
+      "--values" => {
+        output = Values
+        i += 1
+      }
+      "--pointers" => {
+        output = Pointers
+        i += 1
+      }
+      "--matches" => {
+        output = Matches
+        i += 1
+      }
+      "--pretty" => {
+        indent = 2
+        i += 1
+      }
+      _ =>
+        if arg.has_prefix("-") {
+          return Err("unknown option: \{arg}")
+        } else {
+          positional.push(arg)
+          i += 1
+        }
+    }
+  }
+  if show_help {
+    return Ok({
+      path_text: "",
+      file_path: "",
+      options: { output, indent },
+      show_help: true,
+    })
+  }
+  if positional.length() != 2 {
+    return Err("expected <jsonpath> and <file>")
+  }
+  Ok({
+    path_text: positional[0],
+    file_path: positional[1],
+    options: { output, indent },
+    show_help: false,
+  })
+}
+
+///|
+pub fn cli_usage() -> String {
+  (
+    #|Usage: moonjsonpath [--values|--pointers|--matches] [--pretty] <jsonpath> <file>
+    #|
+    #|Examples:
+    #|  moonjsonpath '$.users[*].name' data.json
+    #|  moonjsonpath --pointers '$..name' data.json
+    #|  moonjsonpath --matches --pretty '$.users[?(@.age > 20)]' data.json
+    #|
+  )
+}
+
+///|
+pub fn run_cli(args : Array[String]) -> Int {
+  match CliConfig::parse(args) {
+    Ok(config) =>
+      if config.show_help {
+        println(cli_usage())
+        0
+      } else {
+        match query_json_file_with_options(
+          config.path_text,
+          config.file_path,
+          config.options,
+        ) {
+          Ok(output) => {
+            println(output)
+            0
+          }
+          Err(message) => {
+            println("MoonJSONPath error: \{message}")
+            1
+          }
+        }
+      }
+    Err(message) => {
+      println("MoonJSONPath error: \{message}")
+      println(cli_usage())
+      2
+    }
+  }
 }
 
 ///|
