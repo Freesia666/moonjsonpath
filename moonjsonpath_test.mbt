@@ -117,3 +117,25 @@ test "jsonpath wildcard selects array elements and object members" {
   let meta = @moonjsonpath.Path::compile("$.meta.*").unwrap().query(doc)
   inspect(meta.length(), content="2")
 }
+
+///|
+test "jsonpath recursive descent finds nested object members" {
+  let doc : Json = {
+    "name": "root",
+    "groups": [
+      { "name": "compiler", "members": [{ "name": "Ada" }] },
+      { "name": "runtime", "members": [{ "name": "Grace" }] },
+    ],
+  }
+  let names = @moonjsonpath.Path::compile("$..name").unwrap().query(doc)
+  inspect(names.length(), content="5")
+  inspect(names[0].pointer.to_string(), content="/name")
+  inspect(names[4].pointer.to_string(), content="/groups/1/members/0/name")
+  @json.json_inspect(names.map(item => item.value), content=[
+    "root",
+    "compiler",
+    "Ada",
+    "runtime",
+    "Grace",
+  ])
+}

@@ -278,6 +278,7 @@ pub(all) enum PathSegment {
   Member(String)
   Element(Int)
   Wildcard
+  RecursiveMember(String)
 } derive(Eq, Debug)
 
 ///|
@@ -312,6 +313,22 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
           return Err(path_error(i, "member name expected after '.'"))
         }
         let start = i + 1
+        if chars[start] == '.' {
+          let name_start = start + 1
+          if name_start >= chars.length() {
+            return Err(path_error(i, "member name expected after '..'"))
+          }
+          let mut end = name_start
+          while end < chars.length() && chars[end] != '.' && chars[end] != '[' {
+            end += 1
+          }
+          if end == name_start {
+            return Err(path_error(i, "member name expected after '..'"))
+          }
+          segments.push(RecursiveMember(String::from_array(chars[name_start:end])))
+          i = end
+          continue
+        }
         if chars[start] == '*' {
           segments.push(Wildcard)
           i = start + 1
@@ -398,6 +415,9 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
               }
             _ => ()
           }
+        RecursiveMember(key) => {
+          collect_recursive_member(item.value, item.pointer, key, next)
+        }
       }
     }
     current = next
@@ -408,4 +428,42 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
 ///|
 fn path_error(position : Int, message : String) -> PathError {
   { position, message }
+}
+
+///|
+fn collect_recursive_member(
+  value : Json,
+  pointer : Pointer,
+  key : String,
+  out : Array[PathMatch],
+) -> Unit {
+  match value {
+    Object(object) => {
+      match object.get(key) {
+        Some(found) => out.push({
+          value: found,
+          pointer: { parts: [..pointer.parts, key] },
+        })
+        None => ()
+      }
+      for child_key, child in object {
+        collect_recursive_member(
+          child,
+          { parts: [..pointer.parts, child_key] },
+          key,
+          out,
+        )
+      }
+    }
+    Array(array) =>
+      for index, child in array {
+        collect_recursive_member(
+          child,
+          { parts: [..pointer.parts, index.to_string()] },
+          key,
+          out,
+        )
+      }
+    _ => ()
+  }
 }
