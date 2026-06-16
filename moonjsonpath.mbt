@@ -272,3 +272,111 @@ fn remove_at(
     _ => Err(pointer_error(WrongContainer, path, "cannot descend into a scalar JSON value"))
   }
 }
+
+///|
+pub(all) enum PathSegment {
+  Member(String)
+  Element(Int)
+} derive(Eq, Debug)
+
+///|
+pub(all) struct PathError {
+  position : Int
+  message : String
+} derive(Eq, Debug)
+
+///|
+pub(all) struct PathMatch {
+  value : Json
+  pointer : Pointer
+} derive(Eq, Debug)
+
+///|
+pub(all) struct Path {
+  segments : Array[PathSegment]
+} derive(Eq, Debug)
+
+///|
+pub fn Path::compile(input : String) -> Result[Path, PathError] {
+  let chars = input.to_array()
+  if chars.length() == 0 || chars[0] != '$' {
+    return Err(path_error(0, "JSONPath must start with '$'"))
+  }
+  let segments : Array[PathSegment] = []
+  let mut i = 1
+  while i < chars.length() {
+    match chars[i] {
+      '.' => {
+        if i + 1 >= chars.length() {
+          return Err(path_error(i, "member name expected after '.'"))
+        }
+        let start = i + 1
+        let mut end = start
+        while end < chars.length() && chars[end] != '.' && chars[end] != '[' {
+          end += 1
+        }
+        if end == start {
+          return Err(path_error(i, "member name expected after '.'"))
+        }
+        segments.push(Member(String::from_array(chars[start:end])))
+        i = end
+      }
+      '[' => {
+        let start = i + 1
+        let mut end = start
+        while end < chars.length() && chars[end] != ']' {
+          end += 1
+        }
+        if end >= chars.length() {
+          return Err(path_error(i, "missing closing ']'"))
+        }
+        match parse_array_index(String::from_array(chars[start:end])) {
+          Some(index) => segments.push(Element(index))
+          None => return Err(path_error(start, "array index must be a non-negative integer"))
+        }
+        i = end + 1
+      }
+      _ => return Err(path_error(i, "expected '.', '[' or end of input"))
+    }
+  }
+  Ok({ segments, })
+}
+
+///|
+pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
+  let mut current : Array[PathMatch] = [{ value: doc, pointer: { parts: [] } }]
+  for segment in self.segments {
+    let next : Array[PathMatch] = []
+    for item in current {
+      match segment {
+        Member(key) =>
+          if item.value is Object(object) {
+            match object.get(key) {
+              Some(value) => next.push({
+                value,
+                pointer: { parts: [..item.pointer.parts, key] },
+              })
+              None => ()
+            }
+          }
+        Element(index) =>
+          if item.value is Array(array) {
+            match array.get(index) {
+              Some(value) => next.push({
+                value,
+                pointer: { parts: [..item.pointer.parts, index.to_string()] },
+              })
+              None => ()
+            }
+          }
+      }
+    }
+    current = next
+  }
+  current
+}
+
+///|
+fn path_error(position : Int, message : String) -> PathError {
+  { position, message }
+}

@@ -74,3 +74,26 @@ test "pointer removes object fields and array elements" {
   inspect(without_first is Ok(_), content="true")
   @json.json_inspect(without_first.unwrap(), content={ "user": { "name": "Ada", "secret": true }, "tags": ["b"] })
 }
+
+///|
+test "jsonpath queries dot members and array indexes" {
+  let doc : Json = {
+    "users": [
+      { "name": "Ada", "age": 36 },
+      { "name": "Grace", "age": 85 },
+    ],
+  }
+  let path = @moonjsonpath.Path::compile("$.users[1].name")
+  inspect(path is Ok(_), content="true")
+  let matches = path.unwrap().query(doc)
+  inspect(matches.length(), content="1")
+  inspect(matches[0].pointer.to_string(), content="/users/1/name")
+  @json.json_inspect(matches[0].value, content="Grace")
+}
+
+///|
+test "jsonpath reports syntax errors with byte position" {
+  let path = @moonjsonpath.Path::compile("users[0]")
+  inspect(path is Err(_), content="true")
+  inspect(path.unwrap_err().position, content="0")
+}
