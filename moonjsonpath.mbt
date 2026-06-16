@@ -397,10 +397,10 @@ pub(all) enum Literal {
 } derive(Eq, Debug)
 
 ///|
-pub(all) struct FilterExpr {
-  field : String
-  op : CompareOp
-  literal : Literal
+pub(all) enum FilterExpr {
+  Exists(Array[String])
+  Compare(Array[String], CompareOp, Literal)
+  And(FilterExpr, FilterExpr)
 } derive(Eq, Debug)
 
 ///|
@@ -799,6 +799,14 @@ fn clamp_index(index : Int, len : Int) -> Int {
 
 ///|
 fn parse_filter_expr(expr : String) -> FilterExpr? {
+  match split_filter_and(expr) {
+    Some((left, right)) =>
+      match (parse_filter_expr(left), parse_filter_expr(right)) {
+        (Some(left), Some(right)) => return Some(And(left, right))
+        _ => return None
+      }
+    None => ()
+  }
   let ops : Array[(String, CompareOp)] = [
     ("==", Eq),
     ("!=", Ne),
@@ -816,16 +824,83 @@ fn parse_filter_expr(expr : String) -> FilterExpr? {
         if !left.has_prefix("@.") || left.length() <= 2 {
           return None
         }
-        let field = left[2:].to_owned()
+        let fields = parse_filter_field_path(left[2:].to_owned())
+        if fields.length() == 0 {
+          return None
+        }
         match parse_literal(right) {
-          Some(literal) => return Some({ field, op, literal })
+          Some(literal) => return Some(Compare(fields, op, literal))
           None => return None
         }
       }
       None => ()
     }
   }
+  let trimmed = trim_ascii(expr)
+  if trimmed.has_prefix("@.") && trimmed.length() > 2 {
+    let fields = parse_filter_field_path(trimmed[2:].to_owned())
+    if fields.length() > 0 {
+      return Some(Exists(fields))
+    }
+  }
   None
+}
+
+///|
+fn split_filter_and(expr : String) -> (String, String)? {
+  let chars = expr.to_array()
+  let mut quote : Char? = None
+  let mut escaped = false
+  for i = 0; i + 1 < chars.length(); i = i + 1 {
+    let ch = chars[i]
+    match quote {
+      Some(q) => {
+        if escaped {
+          escaped = false
+        } else if ch == '\\' {
+          escaped = true
+        } else if ch == q {
+          quote = None
+        }
+      }
+      None => {
+        if ch == '\'' || ch == '"' {
+          quote = Some(ch)
+        } else if ch == '&' && chars[i + 1] == '&' {
+          return Some((trim_ascii(String::from_array(chars[:i])), trim_ascii(String::from_array(chars[i + 2:]))))
+        }
+      }
+    }
+  }
+  None
+}
+
+///|
+fn parse_filter_field_path(input : String) -> Array[String] {
+  let fields : Array[String] = []
+  for part in split_simple(input, '.') {
+    let trimmed = trim_ascii(part)
+    if trimmed == "" {
+      return []
+    }
+    fields.push(trimmed)
+  }
+  fields
+}
+
+///|
+fn split_simple(input : String, sep : Char) -> Array[String] {
+  let out : Array[String] = []
+  let chars = input.to_array()
+  let mut start = 0
+  for i, ch in chars {
+    if ch == sep {
+      out.push(String::from_array(chars[start:i]))
+      start = i + 1
+    }
+  }
+  out.push(String::from_array(chars[start:chars.length()]))
+  out
 }
 
 ///|
@@ -863,37 +938,53 @@ fn parse_literal(input : String) -> Literal? {
   if input.length() >= 2 && input.has_prefix("\"") && input.has_suffix("\"") {
     return Some(LString(input[1:input.length() - 1].to_owned()))
   }
-  match parse_number(input) {
-    Some(n) => Some(LNumber(n.to_double()))
+  match parse_json_number_literal(input) {
+    Some(n) => Some(LNumber(n))
     None => None
   }
 }
 
 ///|
-fn parse_number(input : String) -> Int? {
+fn parse_json_number_literal(input : String) -> Double? {
   if input == "" {
     return None
   }
-  let mut value = 0
-  let mut i = 0
   let chars = input.to_array()
-  let mut sign = 1
+  let mut i = 0
+  let mut sign = 1.0
   if chars[0] == '-' {
-    sign = -1
+    sign = -1.0
     i = 1
   }
   if i >= chars.length() {
     return None
   }
-  while i < chars.length() {
-    let ch = chars[i]
-    if ch < '0' || ch > '9' {
-      return None
-    }
-    value = value * 10 + ch.to_int() - '0'.to_int()
+  let mut whole = 0.0
+  let mut saw_digit = false
+  while i < chars.length() && chars[i] >= '0' && chars[i] <= '9' {
+    whole = whole * 10.0 + (chars[i].to_int() - '0'.to_int()).to_double()
+    saw_digit = true
     i += 1
   }
-  Some(value * sign)
+  let mut frac = 0.0
+  if i < chars.length() && chars[i] == '.' {
+    i += 1
+    let mut scale = 0.1
+    let mut saw_frac = false
+    while i < chars.length() && chars[i] >= '0' && chars[i] <= '9' {
+      frac = frac + (chars[i].to_int() - '0'.to_int()).to_double() * scale
+      scale = scale / 10.0
+      saw_frac = true
+      i += 1
+    }
+    if !saw_frac {
+      return None
+    }
+  }
+  if !saw_digit || i != chars.length() {
+    return None
+  }
+  Some(sign * (whole + frac))
 }
 
 ///|
@@ -917,15 +1008,31 @@ fn is_ascii_space(ch : Char) -> Bool {
 
 ///|
 fn filter_matches(value : Json, filter : FilterExpr) -> Bool {
-  match value {
-    Object(object) =>
-      match object.get(filter.field) {
-        Some(field_value) =>
-          compare_json_literal(field_value, filter.op, filter.literal)
+  match filter {
+    Exists(path) => resolve_filter_path(value, path) is Some(_)
+    Compare(path, op, literal) =>
+      match resolve_filter_path(value, path) {
+        Some(field_value) => compare_json_literal(field_value, op, literal)
         None => false
       }
-    _ => false
+    And(left, right) => filter_matches(value, left) && filter_matches(value, right)
   }
+}
+
+///|
+fn resolve_filter_path(value : Json, path : Array[String]) -> Json? {
+  let mut current = value
+  for key in path {
+    match current {
+      Object(object) =>
+        match object.get(key) {
+          Some(next) => current = next
+          None => return None
+        }
+      _ => return None
+    }
+  }
+  Some(current)
 }
 
 ///|

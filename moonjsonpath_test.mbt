@@ -265,3 +265,55 @@ test "jsonpath union selectors combine object keys and array indexes" {
     .query(doc)
   @json.json_inspect(meta.map(item => item.value), content=["fixture", 3])
 }
+
+///|
+test "jsonpath filters support existence nested fields decimals and conjunctions" {
+  let doc : Json = {
+    "books": [
+      {
+        "title": "Cheap MoonBit",
+        "price": 8.95,
+        "available": true,
+        "author": { "name": "Ada" },
+        "isbn": "111",
+      },
+      {
+        "title": "Expensive JSONPath",
+        "price": 22.50,
+        "available": true,
+        "author": { "name": "Grace" },
+      },
+      {
+        "title": "Draft",
+        "price": -1.25,
+        "available": false,
+        "author": { "name": "Ada" },
+        "isbn": "222",
+      },
+    ],
+  }
+
+  let with_isbn = @moonjsonpath.Path::compile("$.books[?(@.isbn)].title")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(with_isbn.map(item => item.value), content=[
+    "Cheap MoonBit", "Draft",
+  ])
+
+  let ada = @moonjsonpath.Path::compile("$.books[?(@.author.name == \"Ada\")].title")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(ada.map(item => item.value), content=[
+    "Cheap MoonBit", "Draft",
+  ])
+
+  let ready = @moonjsonpath.Path::compile("$.books[?(@.price < 10.5 && @.available == true)].title")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(ready.map(item => item.value), content=["Cheap MoonBit"])
+
+  let debt = @moonjsonpath.Path::compile("$.books[?(@.price < 0)].title")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(debt.map(item => item.value), content=["Draft"])
+}
