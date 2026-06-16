@@ -49,3 +49,28 @@ test "pointer reports missing fields and wrong container types" {
   inspect(wrong is Err(_), content="true")
   inspect(wrong.unwrap_err().path, content="/foo/0/name")
 }
+
+///|
+test "pointer sets object fields and array elements without mutating input" {
+  let doc : Json = { "user": { "name": "Ada" }, "tags": ["old"] }
+  let changed = @moonjsonpath.Pointer::parse("/user/name").unwrap().set(doc, "Grace")
+  inspect(changed is Ok(_), content="true")
+  @json.json_inspect(changed.unwrap(), content={ "user": { "name": "Grace" }, "tags": ["old"] })
+  @json.json_inspect(doc, content={ "user": { "name": "Ada" }, "tags": ["old"] })
+
+  let array_changed = @moonjsonpath.Pointer::parse("/tags/0").unwrap().set(doc, "new")
+  inspect(array_changed is Ok(_), content="true")
+  @json.json_inspect(array_changed.unwrap(), content={ "user": { "name": "Ada" }, "tags": ["new"] })
+}
+
+///|
+test "pointer removes object fields and array elements" {
+  let doc : Json = { "user": { "name": "Ada", "secret": true }, "tags": ["a", "b"] }
+  let without_secret = @moonjsonpath.Pointer::parse("/user/secret").unwrap().remove(doc)
+  inspect(without_secret is Ok(_), content="true")
+  @json.json_inspect(without_secret.unwrap(), content={ "user": { "name": "Ada" }, "tags": ["a", "b"] })
+
+  let without_first = @moonjsonpath.Pointer::parse("/tags/0").unwrap().remove(doc)
+  inspect(without_first is Ok(_), content="true")
+  @json.json_inspect(without_first.unwrap(), content={ "user": { "name": "Ada", "secret": true }, "tags": ["b"] })
+}

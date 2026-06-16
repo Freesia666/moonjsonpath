@@ -104,6 +104,22 @@ pub fn Pointer::get(self : Pointer, doc : Json) -> Result[Json, PointerError] {
 }
 
 ///|
+pub fn Pointer::set(self : Pointer, doc : Json, value : Json) -> Result[Json, PointerError] {
+  if self.parts.length() == 0 {
+    return Ok(value)
+  }
+  set_at(doc, self.parts, 0, "", value)
+}
+
+///|
+pub fn Pointer::remove(self : Pointer, doc : Json) -> Result[Json, PointerError] {
+  if self.parts.length() == 0 {
+    return Err(pointer_error(InvalidSyntax, "", "cannot remove the document root"))
+  }
+  remove_at(doc, self.parts, 0, "")
+}
+
+///|
 fn pointer_error(kind : PointerErrorKind, path : String, message : String) -> PointerError {
   { kind, path, message }
 }
@@ -141,4 +157,118 @@ fn parse_array_index(token : String) -> Int? {
     value = value * 10 + ch.to_int() - '0'.to_int()
   }
   Some(value)
+}
+
+///|
+fn set_at(
+  current : Json,
+  parts : Array[String],
+  depth : Int,
+  prefix : String,
+  value : Json,
+) -> Result[Json, PointerError] {
+  let part = parts[depth]
+  let path = append_pointer_path(prefix, part)
+  let last = depth + 1 == parts.length()
+  match current {
+    Object(object) => {
+      if !object.contains(part) {
+        return Err(pointer_error(MissingKey, path, "object key was not found"))
+      }
+      let copy = object.copy()
+      if last {
+        copy.set(part, value)
+      } else {
+        match object.get(part) {
+          Some(child) =>
+            match set_at(child, parts, depth + 1, path, value) {
+              Ok(updated) => copy.set(part, updated)
+              Err(err) => return Err(err)
+            }
+          None => return Err(pointer_error(MissingKey, path, "object key was not found"))
+        }
+      }
+      Ok(Json::object(copy))
+    }
+    Array(array) =>
+      match parse_array_index(part) {
+        Some(index) =>
+          if index < 0 || index >= array.length() {
+            Err(pointer_error(InvalidIndex, path, "array index is out of bounds"))
+          } else {
+            let copy = array.copy()
+            if last {
+              copy[index] = value
+            } else {
+              match set_at(array[index], parts, depth + 1, path, value) {
+                Ok(updated) => copy[index] = updated
+                Err(err) => return Err(err)
+              }
+            }
+            Ok(Json::array(copy))
+          }
+        None => Err(pointer_error(InvalidIndex, path, "array token is not a non-negative integer"))
+      }
+    _ => Err(pointer_error(WrongContainer, path, "cannot descend into a scalar JSON value"))
+  }
+}
+
+///|
+fn remove_at(
+  current : Json,
+  parts : Array[String],
+  depth : Int,
+  prefix : String,
+) -> Result[Json, PointerError] {
+  let part = parts[depth]
+  let path = append_pointer_path(prefix, part)
+  let last = depth + 1 == parts.length()
+  match current {
+    Object(object) => {
+      if !object.contains(part) {
+        return Err(pointer_error(MissingKey, path, "object key was not found"))
+      }
+      let copy = object.copy()
+      if last {
+        copy.remove(part)
+      } else {
+        match object.get(part) {
+          Some(child) =>
+            match remove_at(child, parts, depth + 1, path) {
+              Ok(updated) => copy.set(part, updated)
+              Err(err) => return Err(err)
+            }
+          None => return Err(pointer_error(MissingKey, path, "object key was not found"))
+        }
+      }
+      Ok(Json::object(copy))
+    }
+    Array(array) =>
+      match parse_array_index(part) {
+        Some(index) =>
+          if index < 0 || index >= array.length() {
+            Err(pointer_error(InvalidIndex, path, "array index is out of bounds"))
+          } else {
+            let copy : Array[Json] = []
+            for i, item in array {
+              if i != index {
+                copy.push(item)
+              }
+            }
+            if last {
+              Ok(Json::array(copy))
+            } else {
+              match remove_at(array[index], parts, depth + 1, path) {
+                Ok(updated) => {
+                  copy[index] = updated
+                  Ok(Json::array(copy))
+                }
+                Err(err) => Err(err)
+              }
+            }
+          }
+        None => Err(pointer_error(InvalidIndex, path, "array token is not a non-negative integer"))
+      }
+    _ => Err(pointer_error(WrongContainer, path, "cannot descend into a scalar JSON value"))
+  }
 }
