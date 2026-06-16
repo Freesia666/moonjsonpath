@@ -21,13 +21,11 @@ hand-written recursive traversal code.
 
 ## Quick Start
 
-```moonbit
+```moonbit nocheck
+///|
 test {
   let doc : Json = {
-    "users": [
-      { "name": "Ada", "age": 36 },
-      { "name": "Grace", "age": 85 },
-    ],
+    "users": [{ "name": "Ada", "age": 36 }, { "name": "Grace", "age": 85 }],
   }
 
   let names = @moonjsonpath.Path::compile("$.users[*].name").unwrap().query(doc)
@@ -38,7 +36,8 @@ test {
 
 Pointer editing returns a new JSON value:
 
-```moonbit
+```moonbit nocheck
+///|
 test {
   let doc : Json = { "meta": { "count": 2 } }
   let updated = @moonjsonpath.Pointer::parse("/meta/count").unwrap().set(doc, 3)

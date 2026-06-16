@@ -7,7 +7,9 @@ test "pointer parses root and RFC6901 escaped tokens" {
   let pointer = @moonjsonpath.Pointer::parse("/foo/0/a~1b/m~0n/")
   inspect(pointer is Ok(_), content="true")
   inspect(pointer.unwrap().to_string(), content="/foo/0/a~1b/m~0n/")
-  @json.json_inspect(pointer.unwrap().tokens(), content=["foo", "0", "a/b", "m~n", ""])
+  @json.json_inspect(pointer.unwrap().tokens(), content=[
+    "foo", "0", "a/b", "m~n", "",
+  ])
 }
 
 ///|
@@ -53,35 +55,55 @@ test "pointer reports missing fields and wrong container types" {
 ///|
 test "pointer sets object fields and array elements without mutating input" {
   let doc : Json = { "user": { "name": "Ada" }, "tags": ["old"] }
-  let changed = @moonjsonpath.Pointer::parse("/user/name").unwrap().set(doc, "Grace")
+  let changed = @moonjsonpath.Pointer::parse("/user/name")
+    .unwrap()
+    .set(doc, "Grace")
   inspect(changed is Ok(_), content="true")
-  @json.json_inspect(changed.unwrap(), content={ "user": { "name": "Grace" }, "tags": ["old"] })
+  @json.json_inspect(changed.unwrap(), content={
+    "user": { "name": "Grace" },
+    "tags": ["old"],
+  })
   @json.json_inspect(doc, content={ "user": { "name": "Ada" }, "tags": ["old"] })
 
-  let array_changed = @moonjsonpath.Pointer::parse("/tags/0").unwrap().set(doc, "new")
+  let array_changed = @moonjsonpath.Pointer::parse("/tags/0")
+    .unwrap()
+    .set(doc, "new")
   inspect(array_changed is Ok(_), content="true")
-  @json.json_inspect(array_changed.unwrap(), content={ "user": { "name": "Ada" }, "tags": ["new"] })
+  @json.json_inspect(array_changed.unwrap(), content={
+    "user": { "name": "Ada" },
+    "tags": ["new"],
+  })
 }
 
 ///|
 test "pointer removes object fields and array elements" {
-  let doc : Json = { "user": { "name": "Ada", "secret": true }, "tags": ["a", "b"] }
-  let without_secret = @moonjsonpath.Pointer::parse("/user/secret").unwrap().remove(doc)
+  let doc : Json = {
+    "user": { "name": "Ada", "secret": true },
+    "tags": ["a", "b"],
+  }
+  let without_secret = @moonjsonpath.Pointer::parse("/user/secret")
+    .unwrap()
+    .remove(doc)
   inspect(without_secret is Ok(_), content="true")
-  @json.json_inspect(without_secret.unwrap(), content={ "user": { "name": "Ada" }, "tags": ["a", "b"] })
+  @json.json_inspect(without_secret.unwrap(), content={
+    "user": { "name": "Ada" },
+    "tags": ["a", "b"],
+  })
 
-  let without_first = @moonjsonpath.Pointer::parse("/tags/0").unwrap().remove(doc)
+  let without_first = @moonjsonpath.Pointer::parse("/tags/0")
+    .unwrap()
+    .remove(doc)
   inspect(without_first is Ok(_), content="true")
-  @json.json_inspect(without_first.unwrap(), content={ "user": { "name": "Ada", "secret": true }, "tags": ["b"] })
+  @json.json_inspect(without_first.unwrap(), content={
+    "user": { "name": "Ada", "secret": true },
+    "tags": ["b"],
+  })
 }
 
 ///|
 test "jsonpath queries dot members and array indexes" {
   let doc : Json = {
-    "users": [
-      { "name": "Ada", "age": 36 },
-      { "name": "Grace", "age": 85 },
-    ],
+    "users": [{ "name": "Ada", "age": 36 }, { "name": "Grace", "age": 85 }],
   }
   let path = @moonjsonpath.Path::compile("$.users[1].name")
   inspect(path is Ok(_), content="true")
@@ -101,18 +123,16 @@ test "jsonpath reports syntax errors with byte position" {
 ///|
 test "jsonpath wildcard selects array elements and object members" {
   let doc : Json = {
-    "users": [
-      { "name": "Ada" },
-      { "name": "Grace" },
-      { "name": "Katherine" },
-    ],
+    "users": [{ "name": "Ada" }, { "name": "Grace" }, { "name": "Katherine" }],
     "meta": { "count": 3, "source": "fixture" },
   }
   let names = @moonjsonpath.Path::compile("$.users[*].name").unwrap().query(doc)
   inspect(names.length(), content="3")
   inspect(names[0].pointer.to_string(), content="/users/0/name")
   inspect(names[2].pointer.to_string(), content="/users/2/name")
-  @json.json_inspect(names.map(item => item.value), content=["Ada", "Grace", "Katherine"])
+  @json.json_inspect(names.map(item => item.value), content=[
+    "Ada", "Grace", "Katherine",
+  ])
 
   let meta = @moonjsonpath.Path::compile("$.meta.*").unwrap().query(doc)
   inspect(meta.length(), content="2")
@@ -132,11 +152,7 @@ test "jsonpath recursive descent finds nested object members" {
   inspect(names[0].pointer.to_string(), content="/name")
   inspect(names[4].pointer.to_string(), content="/groups/1/members/0/name")
   @json.json_inspect(names.map(item => item.value), content=[
-    "root",
-    "compiler",
-    "Ada",
-    "runtime",
-    "Grace",
+    "root", "compiler", "Ada", "runtime", "Grace",
   ])
 }
 
@@ -145,7 +161,9 @@ test "jsonpath slice selects array ranges" {
   let doc : Json = { "items": ["zero", "one", "two", "three", "four"] }
   let middle = @moonjsonpath.Path::compile("$.items[1:4]").unwrap().query(doc)
   inspect(middle.length(), content="3")
-  @json.json_inspect(middle.map(item => item.value), content=["one", "two", "three"])
+  @json.json_inspect(middle.map(item => item.value), content=[
+    "one", "two", "three",
+  ])
   inspect(middle[0].pointer.to_string(), content="/items/1")
 
   let first_two = @moonjsonpath.Path::compile("$.items[:2]").unwrap().query(doc)
@@ -164,21 +182,28 @@ test "jsonpath filters arrays with simple comparisons" {
       { "name": "Katherine", "age": 18, "active": true },
     ],
   }
-  let adults = @moonjsonpath.Path::compile("$.users[?(@.age > 20)].name").unwrap().query(doc)
+  let adults = @moonjsonpath.Path::compile("$.users[?(@.age > 20)].name")
+    .unwrap()
+    .query(doc)
   @json.json_inspect(adults.map(item => item.value), content=["Ada", "Grace"])
 
-  let active = @moonjsonpath.Path::compile("$.users[?(@.active == true)].name").unwrap().query(doc)
-  @json.json_inspect(active.map(item => item.value), content=["Ada", "Katherine"])
+  let active = @moonjsonpath.Path::compile("$.users[?(@.active == true)].name")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(active.map(item => item.value), content=[
+    "Ada", "Katherine",
+  ])
 
-  let named = @moonjsonpath.Path::compile("$.users[?(@.name == \"Grace\")].age").unwrap().query(doc)
+  let named = @moonjsonpath.Path::compile("$.users[?(@.name == \"Grace\")].age")
+    .unwrap()
+    .query(doc)
   @json.json_inspect(named.map(item => item.value), content=[85])
 }
 
 ///|
 test "query_json_text parses JSON and serializes matches" {
   let output = @moonjsonpath.query_json_text(
-    "$.users[*].name",
-    "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}",
+    "$.users[*].name", "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}",
   )
   inspect(output is Ok(_), content="true")
   inspect(output.unwrap(), content="[\"Ada\",\"Grace\"]")

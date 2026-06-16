@@ -24,7 +24,13 @@ pub fn Pointer::parse(input : String) -> Result[Pointer, PointerError] {
     return Ok({ parts: [] })
   }
   if !input.has_prefix("/") {
-    return Err(pointer_error(InvalidSyntax, "", "JSON Pointer must be empty or start with '/'"))
+    return Err(
+      pointer_error(
+        InvalidSyntax,
+        "",
+        "JSON Pointer must be empty or start with '/'",
+      ),
+    )
   }
   let parts : Array[String] = []
   let mut current = StringBuilder::new()
@@ -40,13 +46,26 @@ pub fn Pointer::parse(input : String) -> Result[Pointer, PointerError] {
     }
     if ch == '~' {
       if i + 1 >= chars.length() {
-        return Err(pointer_error(InvalidSyntax, input, "unfinished '~' escape in JSON Pointer"))
+        return Err(
+          pointer_error(
+            InvalidSyntax,
+            input,
+            "unfinished '~' escape in JSON Pointer",
+          ),
+        )
       }
       let next = chars[i + 1]
       match next {
         '0' => current.write_char('~')
         '1' => current.write_char('/')
-        _ => return Err(pointer_error(InvalidSyntax, input, "JSON Pointer escape must be '~0' or '~1'"))
+        _ =>
+          return Err(
+            pointer_error(
+              InvalidSyntax,
+              input,
+              "JSON Pointer escape must be '~0' or '~1'",
+            ),
+          )
       }
       i += 2
     } else {
@@ -86,25 +105,53 @@ pub fn Pointer::get(self : Pointer, doc : Json) -> Result[Json, PointerError] {
       Object(object) =>
         match object.get(part) {
           Some(value) => current = value
-          None => return Err(pointer_error(MissingKey, path, "object key was not found"))
+          None =>
+            return Err(
+              pointer_error(MissingKey, path, "object key was not found"),
+            )
         }
       Array(array) =>
         match parse_array_index(part) {
           Some(index) =>
             match array.get(index) {
               Some(value) => current = value
-              None => return Err(pointer_error(InvalidIndex, path, "array index is out of bounds"))
+              None =>
+                return Err(
+                  pointer_error(
+                    InvalidIndex,
+                    path,
+                    "array index is out of bounds",
+                  ),
+                )
             }
-          None => return Err(pointer_error(InvalidIndex, path, "array token is not a non-negative integer"))
+          None =>
+            return Err(
+              pointer_error(
+                InvalidIndex,
+                path,
+                "array token is not a non-negative integer",
+              ),
+            )
         }
-      _ => return Err(pointer_error(WrongContainer, path, "cannot descend into a scalar JSON value"))
+      _ =>
+        return Err(
+          pointer_error(
+            WrongContainer,
+            path,
+            "cannot descend into a scalar JSON value",
+          ),
+        )
     }
   }
   Ok(current)
 }
 
 ///|
-pub fn Pointer::set(self : Pointer, doc : Json, value : Json) -> Result[Json, PointerError] {
+pub fn Pointer::set(
+  self : Pointer,
+  doc : Json,
+  value : Json,
+) -> Result[Json, PointerError] {
   if self.parts.length() == 0 {
     return Ok(value)
   }
@@ -112,15 +159,24 @@ pub fn Pointer::set(self : Pointer, doc : Json, value : Json) -> Result[Json, Po
 }
 
 ///|
-pub fn Pointer::remove(self : Pointer, doc : Json) -> Result[Json, PointerError] {
+pub fn Pointer::remove(
+  self : Pointer,
+  doc : Json,
+) -> Result[Json, PointerError] {
   if self.parts.length() == 0 {
-    return Err(pointer_error(InvalidSyntax, "", "cannot remove the document root"))
+    return Err(
+      pointer_error(InvalidSyntax, "", "cannot remove the document root"),
+    )
   }
   remove_at(doc, self.parts, 0, "")
 }
 
 ///|
-fn pointer_error(kind : PointerErrorKind, path : String, message : String) -> PointerError {
+fn pointer_error(
+  kind : PointerErrorKind,
+  path : String,
+  message : String,
+) -> PointerError {
   { kind, path, message }
 }
 
@@ -185,7 +241,10 @@ fn set_at(
               Ok(updated) => copy.set(part, updated)
               Err(err) => return Err(err)
             }
-          None => return Err(pointer_error(MissingKey, path, "object key was not found"))
+          None =>
+            return Err(
+              pointer_error(MissingKey, path, "object key was not found"),
+            )
         }
       }
       Ok(Json::object(copy))
@@ -194,7 +253,9 @@ fn set_at(
       match parse_array_index(part) {
         Some(index) =>
           if index < 0 || index >= array.length() {
-            Err(pointer_error(InvalidIndex, path, "array index is out of bounds"))
+            Err(
+              pointer_error(InvalidIndex, path, "array index is out of bounds"),
+            )
           } else {
             let copy = array.copy()
             if last {
@@ -207,9 +268,23 @@ fn set_at(
             }
             Ok(Json::array(copy))
           }
-        None => Err(pointer_error(InvalidIndex, path, "array token is not a non-negative integer"))
+        None =>
+          Err(
+            pointer_error(
+              InvalidIndex,
+              path,
+              "array token is not a non-negative integer",
+            ),
+          )
       }
-    _ => Err(pointer_error(WrongContainer, path, "cannot descend into a scalar JSON value"))
+    _ =>
+      Err(
+        pointer_error(
+          WrongContainer,
+          path,
+          "cannot descend into a scalar JSON value",
+        ),
+      )
   }
 }
 
@@ -238,7 +313,10 @@ fn remove_at(
               Ok(updated) => copy.set(part, updated)
               Err(err) => return Err(err)
             }
-          None => return Err(pointer_error(MissingKey, path, "object key was not found"))
+          None =>
+            return Err(
+              pointer_error(MissingKey, path, "object key was not found"),
+            )
         }
       }
       Ok(Json::object(copy))
@@ -247,7 +325,9 @@ fn remove_at(
       match parse_array_index(part) {
         Some(index) =>
           if index < 0 || index >= array.length() {
-            Err(pointer_error(InvalidIndex, path, "array index is out of bounds"))
+            Err(
+              pointer_error(InvalidIndex, path, "array index is out of bounds"),
+            )
           } else {
             let copy : Array[Json] = []
             for i, item in array {
@@ -267,9 +347,23 @@ fn remove_at(
               }
             }
           }
-        None => Err(pointer_error(InvalidIndex, path, "array token is not a non-negative integer"))
+        None =>
+          Err(
+            pointer_error(
+              InvalidIndex,
+              path,
+              "array token is not a non-negative integer",
+            ),
+          )
       }
-    _ => Err(pointer_error(WrongContainer, path, "cannot descend into a scalar JSON value"))
+    _ =>
+      Err(
+        pointer_error(
+          WrongContainer,
+          path,
+          "cannot descend into a scalar JSON value",
+        ),
+      )
   }
 }
 
@@ -352,7 +446,9 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
           if end == name_start {
             return Err(path_error(i, "member name expected after '..'"))
           }
-          segments.push(RecursiveMember(String::from_array(chars[name_start:end])))
+          segments.push(
+            RecursiveMember(String::from_array(chars[name_start:end])),
+          )
           i = end
           continue
         }
@@ -387,17 +483,26 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
           let expr = selector[2:selector.length() - 1].to_owned()
           match parse_filter_expr(expr) {
             Some(filter) => segments.push(Filter(filter))
-            None => return Err(path_error(start, "filter must look like @.field <op> literal"))
+            None =>
+              return Err(
+                path_error(start, "filter must look like @.field <op> literal"),
+              )
           }
         } else if selector.contains(":") {
           match parse_slice_selector(selector) {
             Some((start, end)) => segments.push(Slice(start, end))
-            None => return Err(path_error(start, "slice bounds must be non-negative integers"))
+            None =>
+              return Err(
+                path_error(start, "slice bounds must be non-negative integers"),
+              )
           }
         } else {
           match parse_array_index(selector) {
             Some(index) => segments.push(Element(index))
-            None => return Err(path_error(start, "array index must be a non-negative integer"))
+            None =>
+              return Err(
+                path_error(start, "array index must be a non-negative integer"),
+              )
           }
         }
         i = end + 1
@@ -418,20 +523,22 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
         Member(key) =>
           if item.value is Object(object) {
             match object.get(key) {
-              Some(value) => next.push({
-                value,
-                pointer: { parts: [..item.pointer.parts, key] },
-              })
+              Some(value) =>
+                next.push({
+                  value,
+                  pointer: { parts: [..item.pointer.parts, key] },
+                })
               None => ()
             }
           }
         Element(index) =>
           if item.value is Array(array) {
             match array.get(index) {
-              Some(value) => next.push({
-                value,
-                pointer: { parts: [..item.pointer.parts, index.to_string()] },
-              })
+              Some(value) =>
+                next.push({
+                  value,
+                  pointer: { parts: [..item.pointer.parts, index.to_string()] },
+                })
               None => ()
             }
           }
@@ -453,9 +560,8 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
               }
             _ => ()
           }
-        RecursiveMember(key) => {
+        RecursiveMember(key) =>
           collect_recursive_member(item.value, item.pointer, key, next)
-        }
         Slice(start, end) =>
           if item.value is Array(array) {
             let lo = clamp_index(start.unwrap_or(0), array.length())
@@ -509,8 +615,16 @@ fn parse_slice_selector(selector : String) -> (Int?, Int?)? {
   }
   let left = String::from_array(chars[0:colon])
   let right = String::from_array(chars[colon + 1:chars.length()])
-  let start = if left == "" { Some(None) } else { parse_array_index(left).map(i => Some(i)) }
-  let end = if right == "" { Some(None) } else { parse_array_index(right).map(i => Some(i)) }
+  let start = if left == "" {
+    Some(None)
+  } else {
+    parse_array_index(left).map(i => Some(i))
+  }
+  let end = if right == "" {
+    Some(None)
+  } else {
+    parse_array_index(right).map(i => Some(i))
+  }
   match (start, end) {
     (Some(start), Some(end)) => Some((start, end))
     _ => None
@@ -651,7 +765,8 @@ fn filter_matches(value : Json, filter : FilterExpr) -> Bool {
   match value {
     Object(object) =>
       match object.get(filter.field) {
-        Some(field_value) => compare_json_literal(field_value, filter.op, filter.literal)
+        Some(field_value) =>
+          compare_json_literal(field_value, filter.op, filter.literal)
         None => false
       }
     _ => false
@@ -659,10 +774,15 @@ fn filter_matches(value : Json, filter : FilterExpr) -> Bool {
 }
 
 ///|
-fn compare_json_literal(value : Json, op : CompareOp, literal : Literal) -> Bool {
+fn compare_json_literal(
+  value : Json,
+  op : CompareOp,
+  literal : Literal,
+) -> Bool {
   match (value, literal) {
     (String(actual), LString(expected)) => compare_string(actual, op, expected)
-    (Number(actual, ..), LNumber(expected)) => compare_double(actual, op, expected)
+    (Number(actual, ..), LNumber(expected)) =>
+      compare_double(actual, op, expected)
     (True, LBool(expected)) => compare_bool(true, op, expected)
     (False, LBool(expected)) => compare_bool(false, op, expected)
     (Null, LNull) => op == Eq
@@ -702,14 +822,16 @@ fn compare_double(left : Double, op : CompareOp, right : Double) -> Bool {
 }
 
 ///|
-pub fn query_json_text(path_text : String, json_text : String) -> Result[String, String] {
+pub fn query_json_text(
+  path_text : String,
+  json_text : String,
+) -> Result[String, String] {
   let path = match Path::compile(path_text) {
     Ok(path) => path
-    Err(err) => return Err("invalid JSONPath at \{err.position}: \{err.message}")
+    Err(err) =>
+      return Err("invalid JSONPath at \{err.position}: \{err.message}")
   }
-  let doc = try {
-    @json.parse(json_text)
-  } catch {
+  let doc = @json.parse(json_text) catch {
     err => return Err("invalid JSON input: \{err}")
   }
   let values = path.query(doc).map(item => item.value)
@@ -726,10 +848,8 @@ fn collect_recursive_member(
   match value {
     Object(object) => {
       match object.get(key) {
-        Some(found) => out.push({
-          value: found,
-          pointer: { parts: [..pointer.parts, key] },
-        })
+        Some(found) =>
+          out.push({ value: found, pointer: { parts: [..pointer.parts, key] } })
         None => ()
       }
       for child_key, child in object {

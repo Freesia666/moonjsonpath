@@ -1,0 +1,87 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "RunnerQuan/moonjsonpath"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn query_json_text(String, String) -> Result[String, String]
+
+// Errors
+
+// Types and methods
+pub(all) enum CompareOp {
+  Eq
+  Ne
+  Gt
+  Ge
+  Lt
+  Le
+} derive(Eq, @debug.Debug)
+
+pub(all) struct FilterExpr {
+  field : String
+  op : CompareOp
+  literal : Literal
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Literal {
+  LString(String)
+  LNumber(Double)
+  LBool(Bool)
+  LNull
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Path {
+  segments : Array[PathSegment]
+} derive(Eq, @debug.Debug)
+pub fn Path::compile(String) -> Result[Self, PathError]
+pub fn Path::query(Self, Json) -> Array[PathMatch]
+
+pub(all) struct PathError {
+  position : Int
+  message : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct PathMatch {
+  value : Json
+  pointer : Pointer
+} derive(Eq, @debug.Debug)
+
+pub(all) enum PathSegment {
+  Member(String)
+  Element(Int)
+  Wildcard
+  RecursiveMember(String)
+  Slice(Int?, Int?)
+  Filter(FilterExpr)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Pointer {
+  parts : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn Pointer::get(Self, Json) -> Result[Json, PointerError]
+pub fn Pointer::parse(String) -> Result[Self, PointerError]
+pub fn Pointer::remove(Self, Json) -> Result[Json, PointerError]
+pub fn Pointer::set(Self, Json, Json) -> Result[Json, PointerError]
+pub fn Pointer::to_string(Self) -> String
+pub fn Pointer::tokens(Self) -> Array[String]
+
+pub(all) struct PointerError {
+  kind : PointerErrorKind
+  path : String
+  message : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum PointerErrorKind {
+  InvalidSyntax
+  MissingKey
+  InvalidIndex
+  WrongContainer
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
+
