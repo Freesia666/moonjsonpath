@@ -406,3 +406,38 @@ test "cli args parse output modes and input files" {
   let bad = @moonjsonpath.CliConfig::parse(["moonjsonpath", "--unknown"])
   inspect(bad is Err(_), content="true")
 }
+
+///|
+test "jsonpath bracket parser ignores separators inside quoted selectors" {
+  let doc : Json = {
+    "a]b": { "x,y": "comma", "plain": "ok" },
+    "items": [{ "a]b": 1 }, { "a]b": 2 }],
+  }
+  let bracket = @moonjsonpath.Path::compile("$['a]b']['x,y']")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(bracket.map(item => item.value), content=["comma"])
+
+  let union = @moonjsonpath.Path::compile("$['a]b']['x,y','plain']")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(union.map(item => item.value), content=["comma", "ok"])
+
+  let nested = @moonjsonpath.Path::compile("$.items[*]['a]b']")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(nested.map(item => item.value), content=[1, 2])
+}
+
+///|
+test "jsonpath diagnostics reject malformed brackets and filters" {
+  let missing = @moonjsonpath.Path::compile("$.items['open")
+  inspect(missing is Err(_), content="true")
+  inspect(missing.unwrap_err().position, content="7")
+
+  let bad_union = @moonjsonpath.Path::compile("$.items[0,]")
+  inspect(bad_union is Err(_), content="true")
+
+  let bad_filter = @moonjsonpath.Path::compile("$.items[?(@.price <)]")
+  inspect(bad_filter is Err(_), content="true")
+}

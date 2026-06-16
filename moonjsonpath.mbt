@@ -470,12 +470,9 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
       }
       '[' => {
         let start = i + 1
-        let mut end = start
-        while end < chars.length() && chars[end] != ']' {
-          end += 1
-        }
-        if end >= chars.length() {
-          return Err(path_error(i, "missing closing ']'"))
+        let end = match find_closing_bracket(chars, i) {
+          Some(end) => end
+          None => return Err(path_error(i, "missing closing ']'"))
         }
         let selector = String::from_array(chars[start:end])
         if selector == "*" {
@@ -522,6 +519,36 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
     }
   }
   Ok({ segments, })
+}
+
+///|
+fn find_closing_bracket(chars : Array[Char], open : Int) -> Int? {
+  let mut i = open + 1
+  let mut quote : Char? = None
+  let mut escaped = false
+  while i < chars.length() {
+    let ch = chars[i]
+    match quote {
+      Some(q) => {
+        if escaped {
+          escaped = false
+        } else if ch == '\\' {
+          escaped = true
+        } else if ch == q {
+          quote = None
+        }
+      }
+      None => {
+        if ch == '\'' || ch == '"' {
+          quote = Some(ch)
+        } else if ch == ']' {
+          return Some(i)
+        }
+      }
+    }
+    i += 1
+  }
+  None
 }
 
 ///|
