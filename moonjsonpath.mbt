@@ -375,6 +375,7 @@ pub(all) enum PathSegment {
   RecursiveMember(String)
   Slice(Int?, Int?)
   Filter(FilterExpr)
+  Union(Array[PathSegment])
 } derive(Eq, Debug)
 
 ///|
@@ -479,6 +480,16 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
         let selector = String::from_array(chars[start:end])
         if selector == "*" {
           segments.push(Wildcard)
+        } else if selector.contains(",") {
+          match parse_union_selector(selector) {
+            Some(items) => segments.push(Union(items))
+            None => return Err(path_error(start, "invalid union selector"))
+          }
+        } else if is_quoted_selector(selector) {
+          match parse_quoted_member(selector) {
+            Some(key) => segments.push(Member(key))
+            None => return Err(path_error(start, "invalid quoted member selector"))
+          }
         } else if selector.has_prefix("?(") && selector.has_suffix(")") {
           let expr = selector[2:selector.length() - 1].to_owned()
           match parse_filter_expr(expr) {
@@ -586,11 +597,155 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
               }
             }
           }
+        Union(items) =>
+          for union_segment in items {
+            append_segment_matches(item, union_segment, next)
+          }
       }
     }
     current = next
   }
   current
+}
+
+///|
+fn append_segment_matches(
+  item : PathMatch,
+  segment : PathSegment,
+  next : Array[PathMatch],
+) -> Unit {
+  match segment {
+    Member(key) =>
+      if item.value is Object(object) {
+        match object.get(key) {
+          Some(value) =>
+            next.push({
+              value,
+              pointer: { parts: [..item.pointer.parts, key] },
+            })
+          None => ()
+        }
+      }
+    Element(index) =>
+      if item.value is Array(array) {
+        match array.get(index) {
+          Some(value) =>
+            next.push({
+              value,
+              pointer: { parts: [..item.pointer.parts, index.to_string()] },
+            })
+          None => ()
+        }
+      }
+    _ => ()
+  }
+}
+
+///|
+fn parse_union_selector(selector : String) -> Array[PathSegment]? {
+  let raw_items = split_selector_top_level(selector, ',')
+  if raw_items.length() == 0 {
+    return None
+  }
+  let items : Array[PathSegment] = []
+  for raw in raw_items {
+    let part = trim_ascii(raw)
+    if part == "" {
+      return None
+    }
+    if is_quoted_selector(part) {
+      match parse_quoted_member(part) {
+        Some(key) => items.push(Member(key))
+        None => return None
+      }
+    } else {
+      match parse_array_index(part) {
+        Some(index) => items.push(Element(index))
+        None => return None
+      }
+    }
+  }
+  Some(items)
+}
+
+///|
+fn split_selector_top_level(input : String, sep : Char) -> Array[String] {
+  let out : Array[String] = []
+  let chars = input.to_array()
+  let mut start = 0
+  let mut i = 0
+  let mut quote : Char? = None
+  let mut escaped = false
+  while i < chars.length() {
+    let ch = chars[i]
+    match quote {
+      Some(q) => {
+        if escaped {
+          escaped = false
+        } else if ch == '\\' {
+          escaped = true
+        } else if ch == q {
+          quote = None
+        }
+      }
+      None => {
+        if ch == '\'' || ch == '"' {
+          quote = Some(ch)
+        } else if ch == sep {
+          out.push(String::from_array(chars[start:i]))
+          start = i + 1
+        }
+      }
+    }
+    i += 1
+  }
+  out.push(String::from_array(chars[start:chars.length()]))
+  out
+}
+
+///|
+fn is_quoted_selector(selector : String) -> Bool {
+  selector.length() >= 2 &&
+  ((selector.has_prefix("'") && selector.has_suffix("'")) ||
+   (selector.has_prefix("\"") && selector.has_suffix("\"")))
+}
+
+///|
+fn parse_quoted_member(selector : String) -> String? {
+  if !is_quoted_selector(selector) {
+    return None
+  }
+  let chars = selector.to_array()
+  let quote = chars[0]
+  let out = StringBuilder::new()
+  let mut i = 1
+  while i < chars.length() - 1 {
+    let ch = chars[i]
+    if ch == '\\' {
+      if i + 1 >= chars.length() - 1 {
+        return None
+      }
+      let next = chars[i + 1]
+      match next {
+        '\'' => out.write_char('\'')
+        '"' => out.write_char('"')
+        '\\' => out.write_char('\\')
+        '/' => out.write_char('/')
+        'n' => out.write_char('\n')
+        'r' => out.write_char('\r')
+        't' => out.write_char('\t')
+        _ => out.write_char(next)
+      }
+      i += 2
+    } else {
+      if ch == quote {
+        return None
+      }
+      out.write_char(ch)
+      i += 1
+    }
+  }
+  Some(out.to_string())
 }
 
 ///|

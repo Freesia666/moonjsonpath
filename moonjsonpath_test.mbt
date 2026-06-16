@@ -211,3 +211,57 @@ test "query_json_text parses JSON and serializes matches" {
   let bad = @moonjsonpath.query_json_text("users", "{}")
   inspect(bad is Err(_), content="true")
 }
+
+///|
+test "jsonpath quoted member selectors support spaces punctuation and escapes" {
+  let doc : Json = {
+    "store": {
+      "book list": [
+        { "title": "MoonBit Guide", "author/name": "Ada" },
+        { "title": "JSONPath Notes", "author/name": "Grace" },
+      ],
+      "quote\"key": "escaped",
+    },
+  }
+  let titles = @moonjsonpath.Path::compile("$.store['book list'][*]['title']")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(titles.map(item => item.value), content=[
+    "MoonBit Guide", "JSONPath Notes",
+  ])
+
+  let authors = @moonjsonpath.Path::compile("$.store['book list'][0]['author/name']")
+    .unwrap()
+    .query(doc)
+  inspect(authors[0].pointer.to_string(), content="/store/book list/0/author~1name")
+  @json.json_inspect(authors.map(item => item.value), content=["Ada"])
+
+  let escaped = @moonjsonpath.Path::compile("$.store['quote\\\"key']")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(escaped.map(item => item.value), content=["escaped"])
+}
+
+///|
+test "jsonpath union selectors combine object keys and array indexes" {
+  let doc : Json = {
+    "users": [
+      { "name": "Ada", "role": "compiler" },
+      { "name": "Grace", "role": "runtime" },
+      { "name": "Katherine", "role": "math" },
+    ],
+    "meta": { "count": 3, "source": "fixture", "ignored": true },
+  }
+  let chosen_users = @moonjsonpath.Path::compile("$.users[0,2].name")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(chosen_users.map(item => item.value), content=[
+    "Ada", "Katherine",
+  ])
+  inspect(chosen_users[1].pointer.to_string(), content="/users/2/name")
+
+  let meta = @moonjsonpath.Path::compile("$.meta['source','count']")
+    .unwrap()
+    .query(doc)
+  @json.json_inspect(meta.map(item => item.value), content=["fixture", 3])
+}
