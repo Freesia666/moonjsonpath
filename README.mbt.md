@@ -16,11 +16,14 @@ hand-written recursive traversal code.
   - union selectors: `$.users[0,2]`, `$.meta['source','count']`
   - wildcards: `$.users[*]`, `$.meta.*`
   - recursive member descent: `$..name`
-  - positive array slices: `$.items[1:4]`, `$.items[:2]`, `$.items[3:]`
+  - array slices: `$.items[1:4]`, `$.items[:2]`, `$.items[3:]`, `$.items[::-1]`
+  - negative indexes: `$.items[-1]`
   - filters: `$.users[?(@.age > 20)]`, `?(@.isbn)`, `?(@.a == 1 && @.b)`
 - Match results include both the matched JSON value and its JSON Pointer path.
 - Text and file helpers for parsing JSON input and serializing query results.
 - CLI output modes for values, pointers, and `{ path, value }` match objects.
+- A cookbook suite of runnable scenarios covering API extraction, diagnostics,
+  config keys, filters, slices, and pointer output.
 
 ## Quick Start
 
@@ -78,8 +81,14 @@ and LLM/tool-call workflows.
 
 - Full `jq` compatibility.
 - Script expressions, arithmetic expressions, or user-defined functions inside filters.
-- Full RFC 9535 negative indexes, steps, or regular-expression predicates.
+- Full RFC 9535 regular-expression predicates.
 - Direct stdin reading until the MoonBit standard/x packages expose a stable API.
+
+## Cookbook
+
+The package includes `cookbook_entries()`, `run_cookbook()`, and
+`cookbook_markdown()` for examples that double as regression coverage. These
+examples are useful when preparing a submission demo or README excerpt.
 
 ## Contest Notes
 

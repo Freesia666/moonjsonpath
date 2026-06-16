@@ -502,7 +502,8 @@ pub fn Path::compile(input : String) -> Result[Path, PathError] {
         } else if is_quoted_selector(selector) {
           match parse_quoted_member(selector) {
             Some(key) => segments.push(Member(key))
-            None => return Err(path_error(start, "invalid quoted member selector"))
+            None =>
+              return Err(path_error(start, "invalid quoted member selector"))
           }
         } else if selector.has_prefix("?(") && selector.has_suffix(")") {
           let expr = selector[2:selector.length() - 1].to_owned()
@@ -546,7 +547,7 @@ fn find_closing_bracket(chars : Array[Char], open : Int) -> Int? {
   while i < chars.length() {
     let ch = chars[i]
     match quote {
-      Some(q) => {
+      Some(q) =>
         if escaped {
           escaped = false
         } else if ch == '\\' {
@@ -554,14 +555,12 @@ fn find_closing_bracket(chars : Array[Char], open : Int) -> Int? {
         } else if ch == q {
           quote = None
         }
-      }
-      None => {
+      None =>
         if ch == '\'' || ch == '"' {
           quote = Some(ch)
         } else if ch == ']' {
           return Some(i)
         }
-      }
     }
     i += 1
   }
@@ -684,10 +683,7 @@ fn append_segment_matches(
       if item.value is Object(object) {
         match object.get(key) {
           Some(value) =>
-            next.push({
-              value,
-              pointer: { parts: [..item.pointer.parts, key] },
-            })
+            next.push({ value, pointer: { parts: [..item.pointer.parts, key] } })
           None => ()
         }
       }
@@ -745,7 +741,7 @@ fn split_selector_top_level(input : String, sep : Char) -> Array[String] {
   while i < chars.length() {
     let ch = chars[i]
     match quote {
-      Some(q) => {
+      Some(q) =>
         if escaped {
           escaped = false
         } else if ch == '\\' {
@@ -753,15 +749,13 @@ fn split_selector_top_level(input : String, sep : Char) -> Array[String] {
         } else if ch == q {
           quote = None
         }
-      }
-      None => {
+      None =>
         if ch == '\'' || ch == '"' {
           quote = Some(ch)
         } else if ch == sep {
           out.push(String::from_array(chars[start:i]))
           start = i + 1
         }
-      }
     }
     i += 1
   }
@@ -772,8 +766,10 @@ fn split_selector_top_level(input : String, sep : Char) -> Array[String] {
 ///|
 fn is_quoted_selector(selector : String) -> Bool {
   selector.length() >= 2 &&
-  ((selector.has_prefix("'") && selector.has_suffix("'")) ||
-   (selector.has_prefix("\"") && selector.has_suffix("\"")))
+  (
+    (selector.has_prefix("'") && selector.has_suffix("'")) ||
+    (selector.has_prefix("\"") && selector.has_suffix("\""))
+  )
 }
 
 ///|
@@ -1197,7 +1193,7 @@ fn split_filter_and(expr : String) -> (String, String)? {
   for i = 0; i + 1 < chars.length(); i = i + 1 {
     let ch = chars[i]
     match quote {
-      Some(q) => {
+      Some(q) =>
         if escaped {
           escaped = false
         } else if ch == '\\' {
@@ -1205,14 +1201,17 @@ fn split_filter_and(expr : String) -> (String, String)? {
         } else if ch == q {
           quote = None
         }
-      }
-      None => {
+      None =>
         if ch == '\'' || ch == '"' {
           quote = Some(ch)
         } else if ch == '&' && chars[i + 1] == '&' {
-          return Some((trim_ascii(String::from_array(chars[:i])), trim_ascii(String::from_array(chars[i + 2:]))))
+          return Some(
+            (
+              trim_ascii(String::from_array(chars[:i])),
+              trim_ascii(String::from_array(chars[i + 2:])),
+            ),
+          )
         }
-      }
     }
   }
   None
@@ -1358,7 +1357,8 @@ fn filter_matches(value : Json, filter : FilterExpr) -> Bool {
         Some(field_value) => compare_json_literal(field_value, op, literal)
         None => false
       }
-    And(left, right) => filter_matches(value, left) && filter_matches(value, right)
+    And(left, right) =>
+      filter_matches(value, left) && filter_matches(value, right)
   }
 }
 
@@ -1504,14 +1504,13 @@ pub fn query_json_file_with_options(
 fn render_matches(matches : Array[PathMatch], options : QueryOptions) -> String {
   let json = match options.output {
     Values => Json::array(matches.map(item => item.value))
-    Pointers => Json::array(matches.map(item => item.pointer.to_string().to_json()))
+    Pointers =>
+      Json::array(matches.map(item => item.pointer.to_string().to_json()))
     Matches =>
       Json::array(
         matches.map(item => {
-          {
-            "path": item.pointer.to_string(),
-            "value": item.value,
-          }
+          "path": item.pointer.to_string(),
+          "value": item.value,
         }),
       )
   }
@@ -1605,11 +1604,12 @@ pub fn run_cli(args : Array[String]) -> Int {
         println(cli_usage())
         0
       } else {
-        match query_json_file_with_options(
-          config.path_text,
-          config.file_path,
-          config.options,
-        ) {
+        match
+          query_json_file_with_options(
+            config.path_text,
+            config.file_path,
+            config.options,
+          ) {
           Ok(output) => {
             println(output)
             0

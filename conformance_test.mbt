@@ -51,7 +51,9 @@ fn conformance_cases() -> Array[JsonPathCase] {
     {
       name: "dot member path selects all authors",
       path: "$.store.book[*].author",
-      expected: ["Nigel Rees", "Evelyn Waugh", "Herman Melville", "J. R. R. Tolkien"],
+      expected: [
+        "Nigel Rees", "Evelyn Waugh", "Herman Melville", "J. R. R. Tolkien",
+      ],
     },
     {
       name: "array index selects the third book",

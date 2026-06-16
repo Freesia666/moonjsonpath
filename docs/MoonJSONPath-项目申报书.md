@@ -18,6 +18,7 @@ MoonJSONPath 面向 MoonBit 工具链、配置处理、API 客户端、测试 fi
 - 提供 `query_json_text`、`query_json_file` 和带输出选项的查询入口，用于解析 JSON 字符串或文件并输出查询结果。
 - 支持 values、pointers、matches 三种输出模式，matches 模式返回 `{ path, value }` 结构，适合诊断和工具链集成。
 - 提供 Path canonical formatter 和错误诊断文本，方便 CLI、测试和文档展示。
+- 提供 cookbook 示例集合，覆盖 API 响应提取、配置 key 查询、递归查询、过滤器、切片、反向读取和 Pointer 输出等真实场景。
 - 提供 `cmd/main` 可运行示例、README 示例和测试用例。
 - 使用 CI 执行 `moon check` 与 `moon test`。
 

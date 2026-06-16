@@ -230,10 +230,15 @@ test "jsonpath quoted member selectors support spaces punctuation and escapes" {
     "MoonBit Guide", "JSONPath Notes",
   ])
 
-  let authors = @moonjsonpath.Path::compile("$.store['book list'][0]['author/name']")
+  let authors = @moonjsonpath.Path::compile(
+      "$.store['book list'][0]['author/name']",
+    )
     .unwrap()
     .query(doc)
-  inspect(authors[0].pointer.to_string(), content="/store/book list/0/author~1name")
+  inspect(
+    authors[0].pointer.to_string(),
+    content="/store/book list/0/author~1name",
+  )
   @json.json_inspect(authors.map(item => item.value), content=["Ada"])
 
   let escaped = @moonjsonpath.Path::compile("$.store['quote\\\"key']")
@@ -300,14 +305,18 @@ test "jsonpath filters support existence nested fields decimals and conjunctions
     "Cheap MoonBit", "Draft",
   ])
 
-  let ada = @moonjsonpath.Path::compile("$.books[?(@.author.name == \"Ada\")].title")
+  let ada = @moonjsonpath.Path::compile(
+      "$.books[?(@.author.name == \"Ada\")].title",
+    )
     .unwrap()
     .query(doc)
   @json.json_inspect(ada.map(item => item.value), content=[
     "Cheap MoonBit", "Draft",
   ])
 
-  let ready = @moonjsonpath.Path::compile("$.books[?(@.price < 10.5 && @.available == true)].title")
+  let ready = @moonjsonpath.Path::compile(
+      "$.books[?(@.price < 10.5 && @.available == true)].title",
+    )
     .unwrap()
     .query(doc)
   @json.json_inspect(ready.map(item => item.value), content=["Cheap MoonBit"])
@@ -332,8 +341,7 @@ test "query_json_file reads JSON documents from disk" {
   @fs.create_dir(dir)
   let path = "\{dir}/data.json"
   @fs.write_string_to_file(
-    path,
-    "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}",
+    path, "{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}]}",
   )
   let output = @moonjsonpath.query_json_file("$.users[*].name", path)
   inspect(output is Ok(_), content="true")
@@ -386,17 +394,16 @@ test "query options serialize values pointers and match objects" {
 ///|
 test "cli args parse output modes and input files" {
   let parsed = @moonjsonpath.CliConfig::parse([
-    "moonjsonpath",
-    "--matches",
-    "--pretty",
-    "$.users[*].name",
-    "data.json",
+    "moonjsonpath", "--matches", "--pretty", "$.users[*].name", "data.json",
   ])
   inspect(parsed is Ok(_), content="true")
   let config = parsed.unwrap()
   inspect(config.path_text, content="$.users[*].name")
   inspect(config.file_path, content="data.json")
-  inspect(config.options.output is @moonjsonpath.OutputMode::Matches, content="true")
+  inspect(
+    config.options.output is @moonjsonpath.OutputMode::Matches,
+    content="true",
+  )
   inspect(config.options.indent, content="2")
 
   let help = @moonjsonpath.CliConfig::parse(["moonjsonpath", "--help"])
@@ -465,8 +472,7 @@ test "jsonpath canonical formatting preserves query meaning" {
 
 ///|
 test "diagnostic helpers describe parse and pointer errors" {
-  let path_error = @moonjsonpath.Path::compile("$.items[?(@.price <)]")
-    .unwrap_err()
+  let path_error = @moonjsonpath.Path::compile("$.items[?(@.price <)]").unwrap_err()
   inspect(
     path_error.describe("$.items[?(@.price <)]"),
     content="invalid JSONPath at 8: filter must look like @.field <op> literal\n$.items[?(@.price <)]\n        ^",

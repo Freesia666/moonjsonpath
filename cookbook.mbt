@@ -160,13 +160,15 @@ pub fn cookbook_entries() -> Array[CookbookEntry] {
 }
 
 ///|
-pub fn CookbookEntry::run(self : CookbookEntry) -> Result[CookbookResult, String] {
+pub fn CookbookEntry::run(
+  self : CookbookEntry,
+) -> Result[CookbookResult, String] {
   let indent = if self.id == "pretty-match-output" { 2 } else { 0 }
-  let output = match query_json_text_with_options(
-    self.path_text,
-    self.json_text,
-    { output: self.output_mode, indent },
-  ) {
+  let output = match
+    query_json_text_with_options(self.path_text, self.json_text, {
+      output: self.output_mode,
+      indent,
+    }) {
     Ok(output) => output
     Err(message) => return Err(message)
   }
@@ -181,18 +183,19 @@ pub fn CookbookEntry::run(self : CookbookEntry) -> Result[CookbookResult, String
 
 ///|
 pub fn run_cookbook() -> Array[CookbookResult] {
-  cookbook_entries().map(entry =>
+  cookbook_entries().map(entry => {
     match entry.run() {
       Ok(result) => result
-      Err(message) => {
-        id: entry.id,
-        title: entry.title,
-        output: message,
-        expected: entry.expected,
-        passed: false,
-      }
-    },
-  )
+      Err(message) =>
+        {
+          id: entry.id,
+          title: entry.title,
+          output: message,
+          expected: entry.expected,
+          passed: false,
+        }
+    }
+  })
 }
 
 ///|

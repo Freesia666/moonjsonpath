@@ -6,11 +6,35 @@ import {
 }
 
 // Values
+pub fn cli_usage() -> String
+
+pub fn cookbook_entries() -> Array[CookbookEntry]
+
+pub fn cookbook_markdown() -> String
+
+pub fn query_json_file(String, String) -> Result[String, String]
+
+pub fn query_json_file_with_options(String, String, QueryOptions) -> Result[String, String]
+
 pub fn query_json_text(String, String) -> Result[String, String]
+
+pub fn query_json_text_with_options(String, String, QueryOptions) -> Result[String, String]
+
+pub fn run_cli(Array[String]) -> Int
+
+pub fn run_cookbook() -> Array[CookbookResult]
 
 // Errors
 
 // Types and methods
+pub(all) struct CliConfig {
+  path_text : String
+  file_path : String
+  options : QueryOptions
+  show_help : Bool
+} derive(Eq, @debug.Debug)
+pub fn CliConfig::parse(Array[String]) -> Result[Self, String]
+
 pub(all) enum CompareOp {
   Eq
   Ne
@@ -20,10 +44,29 @@ pub(all) enum CompareOp {
   Le
 } derive(Eq, @debug.Debug)
 
-pub(all) struct FilterExpr {
-  field : String
-  op : CompareOp
-  literal : Literal
+pub(all) struct CookbookEntry {
+  id : String
+  title : String
+  json_text : String
+  path_text : String
+  output_mode : OutputMode
+  expected : String
+  note : String
+} derive(Eq, @debug.Debug)
+pub fn CookbookEntry::run(Self) -> Result[CookbookResult, String]
+
+pub(all) struct CookbookResult {
+  id : String
+  title : String
+  output : String
+  expected : String
+  passed : Bool
+} derive(Eq, @debug.Debug)
+
+pub(all) enum FilterExpr {
+  Exists(Array[String])
+  Compare(Array[String], CompareOp, Literal)
+  And(FilterExpr, FilterExpr)
 } derive(Eq, @debug.Debug)
 
 pub(all) enum Literal {
@@ -33,16 +76,24 @@ pub(all) enum Literal {
   LNull
 } derive(Eq, @debug.Debug)
 
+pub(all) enum OutputMode {
+  Values
+  Pointers
+  Matches
+} derive(Eq, @debug.Debug)
+
 pub(all) struct Path {
   segments : Array[PathSegment]
 } derive(Eq, @debug.Debug)
 pub fn Path::compile(String) -> Result[Self, PathError]
 pub fn Path::query(Self, Json) -> Array[PathMatch]
+pub fn Path::to_string(Self) -> String
 
 pub(all) struct PathError {
   position : Int
   message : String
 } derive(Eq, @debug.Debug)
+pub fn PathError::describe(Self, String) -> String
 
 pub(all) struct PathMatch {
   value : Json
@@ -54,8 +105,9 @@ pub(all) enum PathSegment {
   Element(Int)
   Wildcard
   RecursiveMember(String)
-  Slice(Int?, Int?)
+  Slice(Int?, Int?, Int?)
   Filter(FilterExpr)
+  Union(Array[PathSegment])
 } derive(Eq, @debug.Debug)
 
 pub(all) struct Pointer {
@@ -73,6 +125,7 @@ pub(all) struct PointerError {
   path : String
   message : String
 } derive(Eq, @debug.Debug)
+pub fn PointerError::describe(Self) -> String
 
 pub(all) enum PointerErrorKind {
   InvalidSyntax
@@ -80,6 +133,14 @@ pub(all) enum PointerErrorKind {
   InvalidIndex
   WrongContainer
 } derive(Eq, @debug.Debug)
+
+pub(all) struct QueryOptions {
+  output : OutputMode
+  indent : Int
+} derive(Eq, @debug.Debug)
+pub fn QueryOptions::matches(indent? : Int) -> Self
+pub fn QueryOptions::pointers(indent? : Int) -> Self
+pub fn QueryOptions::values(indent? : Int) -> Self
 
 // Type aliases
 
