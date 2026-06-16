@@ -441,3 +441,43 @@ test "jsonpath diagnostics reject malformed brackets and filters" {
   let bad_filter = @moonjsonpath.Path::compile("$.items[?(@.price <)]")
   inspect(bad_filter is Err(_), content="true")
 }
+
+///|
+test "jsonpath canonical formatting preserves query meaning" {
+  let cases : Array[(String, String)] = [
+    ("$", "$"),
+    ("$.store.book[0].title", "$.store.book[0].title"),
+    ("$['weird/key']['space key']", "$['weird/key']['space key']"),
+    ("$.users[*].name", "$.users[*].name"),
+    ("$..price", "$..price"),
+    ("$.items[1:3]", "$.items[1:3]"),
+    ("$.items[:2]", "$.items[:2]"),
+    ("$.items[3:]", "$.items[3:]"),
+    ("$.users[0,2].name", "$.users[0,2].name"),
+    ("$.meta['source','count']", "$.meta['source','count']"),
+  ]
+  for pair in cases {
+    let (input, expected) = pair
+    let path = @moonjsonpath.Path::compile(input).unwrap()
+    inspect(path.to_string(), content=expected)
+  }
+}
+
+///|
+test "diagnostic helpers describe parse and pointer errors" {
+  let path_error = @moonjsonpath.Path::compile("$.items[?(@.price <)]")
+    .unwrap_err()
+  inspect(
+    path_error.describe("$.items[?(@.price <)]"),
+    content="invalid JSONPath at 8: filter must look like @.field <op> literal\n$.items[?(@.price <)]\n        ^",
+  )
+
+  let pointer_error = @moonjsonpath.Pointer::parse("/users/3")
+    .unwrap()
+    .get({ "users": [] })
+    .unwrap_err()
+  inspect(
+    pointer_error.describe(),
+    content="invalid JSON Pointer at /users/3: array index is out of bounds",
+  )
+}

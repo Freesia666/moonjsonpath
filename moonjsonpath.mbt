@@ -172,6 +172,11 @@ pub fn Pointer::remove(
 }
 
 ///|
+pub fn PointerError::describe(self : PointerError) -> String {
+  "invalid JSON Pointer at \{self.path}: \{self.message}"
+}
+
+///|
 fn pointer_error(
   kind : PointerErrorKind,
   path : String,
@@ -636,6 +641,35 @@ pub fn Path::query(self : Path, doc : Json) -> Array[PathMatch] {
 }
 
 ///|
+pub fn Path::to_string(self : Path) -> String {
+  let out = StringBuilder::new()
+  out.write_char('$')
+  for segment in self.segments {
+    write_path_segment(out, segment)
+  }
+  out.to_string()
+}
+
+///|
+pub fn PathError::describe(self : PathError, input : String) -> String {
+  let out = StringBuilder::new()
+  out.write_string("invalid JSONPath at ")
+  out.write_object(self.position)
+  out.write_string(": ")
+  out.write_string(self.message)
+  out.write_char('\n')
+  out.write_string(input)
+  out.write_char('\n')
+  let mut i = 0
+  while i < self.position {
+    out.write_char(' ')
+    i += 1
+  }
+  out.write_char('^')
+  out.to_string()
+}
+
+///|
 fn append_segment_matches(
   item : PathMatch,
   segment : PathSegment,
@@ -778,6 +812,192 @@ fn parse_quoted_member(selector : String) -> String? {
 ///|
 fn path_error(position : Int, message : String) -> PathError {
   { position, message }
+}
+
+///|
+fn write_path_segment(out : StringBuilder, segment : PathSegment) -> Unit {
+  match segment {
+    Member(key) => write_member_selector(out, key)
+    Element(index) => {
+      out.write_char('[')
+      out.write_object(index)
+      out.write_char(']')
+    }
+    Wildcard => out.write_string("[*]")
+    RecursiveMember(key) => {
+      out.write_string("..")
+      if is_identifier_name(key) {
+        out.write_string(key)
+      } else {
+        write_quoted_selector(out, key)
+      }
+    }
+    Slice(start, end) => {
+      out.write_char('[')
+      match start {
+        Some(start) => out.write_object(start)
+        None => ()
+      }
+      out.write_char(':')
+      match end {
+        Some(end) => out.write_object(end)
+        None => ()
+      }
+      out.write_char(']')
+    }
+    Filter(filter) => {
+      out.write_string("[?(")
+      write_filter_expr(out, filter)
+      out.write_string(")]")
+    }
+    Union(items) => {
+      out.write_char('[')
+      for index, item in items {
+        if index > 0 {
+          out.write_char(',')
+        }
+        write_union_item(out, item)
+      }
+      out.write_char(']')
+    }
+  }
+}
+
+///|
+fn write_member_selector(out : StringBuilder, key : String) -> Unit {
+  if is_identifier_name(key) {
+    out.write_char('.')
+    out.write_string(key)
+  } else {
+    write_quoted_selector(out, key)
+  }
+}
+
+///|
+fn write_union_item(out : StringBuilder, item : PathSegment) -> Unit {
+  match item {
+    Member(key) => write_quoted_member(out, key)
+    Element(index) => out.write_object(index)
+    _ => write_path_segment(out, item)
+  }
+}
+
+///|
+fn write_quoted_selector(out : StringBuilder, key : String) -> Unit {
+  out.write_char('[')
+  write_quoted_member(out, key)
+  out.write_char(']')
+}
+
+///|
+fn write_quoted_member(out : StringBuilder, key : String) -> Unit {
+  out.write_char('\'')
+  for ch in key {
+    match ch {
+      '\'' => out.write_string("\\'")
+      '\\' => out.write_string("\\\\")
+      '\n' => out.write_string("\\n")
+      '\r' => out.write_string("\\r")
+      '\t' => out.write_string("\\t")
+      _ => out.write_char(ch)
+    }
+  }
+  out.write_char('\'')
+}
+
+///|
+fn is_identifier_name(key : String) -> Bool {
+  if key == "" {
+    return false
+  }
+  for i, ch in key.to_array() {
+    if i == 0 {
+      if !is_identifier_start(ch) {
+        return false
+      }
+    } else if !is_identifier_continue(ch) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn is_identifier_start(ch : Char) -> Bool {
+  (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_'
+}
+
+///|
+fn is_identifier_continue(ch : Char) -> Bool {
+  is_identifier_start(ch) || (ch >= '0' && ch <= '9')
+}
+
+///|
+fn write_filter_expr(out : StringBuilder, filter : FilterExpr) -> Unit {
+  match filter {
+    Exists(path) => {
+      out.write_string("@.")
+      write_filter_path(out, path)
+    }
+    Compare(path, op, literal) => {
+      out.write_string("@.")
+      write_filter_path(out, path)
+      out.write_char(' ')
+      out.write_string(compare_op_to_string(op))
+      out.write_char(' ')
+      write_literal(out, literal)
+    }
+    And(left, right) => {
+      write_filter_expr(out, left)
+      out.write_string(" && ")
+      write_filter_expr(out, right)
+    }
+  }
+}
+
+///|
+fn write_filter_path(out : StringBuilder, path : Array[String]) -> Unit {
+  for index, part in path {
+    if index > 0 {
+      out.write_char('.')
+    }
+    out.write_string(part)
+  }
+}
+
+///|
+fn compare_op_to_string(op : CompareOp) -> String {
+  match op {
+    Eq => "=="
+    Ne => "!="
+    Gt => ">"
+    Ge => ">="
+    Lt => "<"
+    Le => "<="
+  }
+}
+
+///|
+fn write_literal(out : StringBuilder, literal : Literal) -> Unit {
+  match literal {
+    LString(value) => {
+      out.write_char('"')
+      for ch in value {
+        match ch {
+          '"' => out.write_string("\\\"")
+          '\\' => out.write_string("\\\\")
+          '\n' => out.write_string("\\n")
+          '\r' => out.write_string("\\r")
+          '\t' => out.write_string("\\t")
+          _ => out.write_char(ch)
+        }
+      }
+      out.write_char('"')
+    }
+    LNumber(value) => out.write_object(value)
+    LBool(value) => out.write_string(if value { "true" } else { "false" })
+    LNull => out.write_string("null")
+  }
 }
 
 ///|
