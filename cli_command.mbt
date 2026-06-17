@@ -44,7 +44,7 @@ pub fn OutputMode::to_string(self : OutputMode) -> String {
 ///|
 pub fn CliCommand::parse(args : Array[String]) -> Result[CliCommand, String] {
   if args.length() <= 1 {
-    return Err("expected a command or JSONPath query")
+    return Ok(make_help_command())
   }
   let mut output = Values
   let mut indent = 0

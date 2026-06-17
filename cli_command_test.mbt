@@ -1,4 +1,11 @@
 ///|
+test "cli command parser treats no arguments as help" {
+  let parsed = @moonjsonpath.CliCommand::parse(["moonjsonpath"])
+  inspect(parsed is Ok(_), content="true")
+  inspect(parsed.unwrap().kind.to_string(), content="Help")
+}
+
+///|
 test "cli command parser supports explicit query and legacy query forms" {
   let explicit = @moonjsonpath.CliCommand::parse([
     "moonjsonpath", "query", "--matches", "--pretty", "$.users[*]", "data.json",
