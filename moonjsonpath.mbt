@@ -406,6 +406,13 @@ pub(all) enum CompareOp {
 } derive(Eq, Debug)
 
 ///|
+pub(all) enum StringOp {
+  Contains
+  StartsWith
+  EndsWith
+} derive(Eq, Debug)
+
+///|
 pub(all) enum Literal {
   LString(String)
   LNumber(Double)
@@ -417,7 +424,11 @@ pub(all) enum Literal {
 pub(all) enum FilterExpr {
   Exists(Array[String])
   Compare(Array[String], CompareOp, Literal)
+  StringMatch(Array[String], StringOp, String)
+  LengthCompare(Array[String], CompareOp, Literal)
   And(FilterExpr, FilterExpr)
+  Or(FilterExpr, FilterExpr)
+  Not(FilterExpr)
 } derive(Eq, Debug)
 
 ///|
@@ -544,6 +555,7 @@ fn find_closing_bracket(chars : Array[Char], open : Int) -> Int? {
   let mut i = open + 1
   let mut quote : Char? = None
   let mut escaped = false
+  let mut nested = 0
   while i < chars.length() {
     let ch = chars[i]
     match quote {
@@ -558,8 +570,13 @@ fn find_closing_bracket(chars : Array[Char], open : Int) -> Int? {
       None =>
         if ch == '\'' || ch == '"' {
           quote = Some(ch)
+        } else if ch == '[' {
+          nested += 1
         } else if ch == ']' {
-          return Some(i)
+          if nested == 0 {
+            return Some(i)
+          }
+          nested -= 1
         }
     }
     i += 1
@@ -955,10 +972,37 @@ fn write_filter_expr(out : StringBuilder, filter : FilterExpr) -> Unit {
       out.write_char(' ')
       write_literal(out, literal)
     }
+    StringMatch(path, op, needle) => {
+      out.write_string("@.")
+      write_filter_path(out, path)
+      out.write_char(' ')
+      out.write_string(string_op_to_string(op))
+      out.write_char(' ')
+      write_literal(out, LString(needle))
+    }
+    LengthCompare(path, op, literal) => {
+      out.write_string("@.")
+      write_filter_path(out, path)
+      out.write_string(".length ")
+      out.write_string(compare_op_to_string(op))
+      out.write_char(' ')
+      write_literal(out, literal)
+    }
     And(left, right) => {
       write_filter_expr(out, left)
       out.write_string(" && ")
       write_filter_expr(out, right)
+    }
+    Or(left, right) => {
+      write_filter_expr(out, left)
+      out.write_string(" || ")
+      write_filter_expr(out, right)
+    }
+    Not(inner) => {
+      out.write_char('!')
+      out.write_char('(')
+      write_filter_expr(out, inner)
+      out.write_char(')')
     }
   }
 }
@@ -982,6 +1026,15 @@ fn compare_op_to_string(op : CompareOp) -> String {
     Ge => ">="
     Lt => "<"
     Le => "<="
+  }
+}
+
+///|
+fn string_op_to_string(op : StringOp) -> String {
+  match op {
+    Contains => "contains"
+    StartsWith => "starts_with"
+    EndsWith => "ends_with"
   }
 }
 
@@ -1138,13 +1191,49 @@ fn clamp_reverse_end(index : Int, len : Int) -> Int {
 
 ///|
 fn parse_filter_expr(expr : String) -> FilterExpr? {
-  match split_filter_and(expr) {
+  let expr = strip_wrapping_parens(trim_ascii(expr))
+  match split_filter_binary(expr, "||") {
+    Some((left, right)) =>
+      match (parse_filter_expr(left), parse_filter_expr(right)) {
+        (Some(left), Some(right)) => return Some(Or(left, right))
+        _ => return None
+      }
+    None => ()
+  }
+  match split_filter_binary(expr, "&&") {
     Some((left, right)) =>
       match (parse_filter_expr(left), parse_filter_expr(right)) {
         (Some(left), Some(right)) => return Some(And(left, right))
         _ => return None
       }
     None => ()
+  }
+  if expr.has_prefix("!") {
+    let rest = trim_ascii(expr[1:].to_owned())
+    match parse_filter_expr(rest) {
+      Some(inner) => return Some(Not(inner))
+      None => return None
+    }
+  }
+  let string_ops : Array[(String, StringOp)] = [
+    ("starts_with", StartsWith),
+    ("ends_with", EndsWith),
+    ("contains", Contains),
+  ]
+  for pair in string_ops {
+    let (op_text, op) = pair
+    match find_word_operator(expr, op_text) {
+      Some(pos) => {
+        let left = trim_ascii(expr[:pos].to_owned())
+        let right = trim_ascii(expr[pos + op_text.length():].to_owned())
+        match (parse_current_path(left), parse_literal(right)) {
+          (Some(path), Some(LString(needle))) =>
+            return Some(StringMatch(path, op, needle))
+          _ => return None
+        }
+      }
+      None => ()
+    }
   }
   let ops : Array[(String, CompareOp)] = [
     ("==", Eq),
@@ -1160,36 +1249,89 @@ fn parse_filter_expr(expr : String) -> FilterExpr? {
       Some(pos) => {
         let left = trim_ascii(expr[:pos].to_owned())
         let right = trim_ascii(expr[pos + op_text.length():].to_owned())
-        if !left.has_prefix("@.") || left.length() <= 2 {
-          return None
-        }
-        let fields = parse_filter_field_path(left[2:].to_owned())
-        if fields.length() == 0 {
-          return None
-        }
-        match parse_literal(right) {
-          Some(literal) => return Some(Compare(fields, op, literal))
-          None => return None
+        match (parse_current_path(left), parse_literal(right)) {
+          (Some(fields), Some(literal)) =>
+            if fields.length() > 0 && fields[fields.length() - 1] == "length" {
+              return Some(LengthCompare(copy_string_prefix(fields, fields.length() - 1), op, literal))
+            } else {
+              return Some(Compare(fields, op, literal))
+            }
+          _ => return None
         }
       }
       None => ()
     }
   }
   let trimmed = trim_ascii(expr)
-  if trimmed.has_prefix("@.") && trimmed.length() > 2 {
-    let fields = parse_filter_field_path(trimmed[2:].to_owned())
-    if fields.length() > 0 {
-      return Some(Exists(fields))
-    }
+  match parse_current_path(trimmed) {
+    Some(fields) =>
+      if fields.length() > 0 {
+        return Some(Exists(fields))
+      }
+    None => ()
   }
   None
 }
 
 ///|
-fn split_filter_and(expr : String) -> (String, String)? {
-  let chars = expr.to_array()
+fn strip_wrapping_parens(input : String) -> String {
+  let mut current = input
+  let mut changed = true
+  while changed {
+    changed = false
+    let chars = current.to_array()
+    if chars.length() >= 2 && chars[0] == '(' && chars[chars.length() - 1] == ')' {
+      match matching_outer_parens(chars) {
+        true => {
+          current = trim_ascii(String::from_array(chars[1:chars.length() - 1]))
+          changed = true
+        }
+        false => ()
+      }
+    }
+  }
+  current
+}
+
+///|
+fn matching_outer_parens(chars : Array[Char]) -> Bool {
+  let mut depth = 0
   let mut quote : Char? = None
   let mut escaped = false
+  for i, ch in chars {
+    match quote {
+      Some(q) =>
+        if escaped {
+          escaped = false
+        } else if ch == '\\' {
+          escaped = true
+        } else if ch == q {
+          quote = None
+        }
+      None =>
+        if ch == '\'' || ch == '"' {
+          quote = Some(ch)
+        } else if ch == '(' {
+          depth += 1
+        } else if ch == ')' {
+          depth -= 1
+          if depth == 0 && i != chars.length() - 1 {
+            return false
+          }
+        }
+    }
+  }
+  depth == 0
+}
+
+///|
+fn split_filter_binary(expr : String, op : String) -> (String, String)? {
+  let chars = expr.to_array()
+  let target = op.to_array()
+  let mut quote : Char? = None
+  let mut escaped = false
+  let mut depth = 0
+  let mut bracket = 0
   for i = 0; i + 1 < chars.length(); i = i + 1 {
     let ch = chars[i]
     match quote {
@@ -1204,11 +1346,19 @@ fn split_filter_and(expr : String) -> (String, String)? {
       None =>
         if ch == '\'' || ch == '"' {
           quote = Some(ch)
-        } else if ch == '&' && chars[i + 1] == '&' {
+        } else if ch == '(' {
+          depth += 1
+        } else if ch == ')' {
+          depth -= 1
+        } else if ch == '[' {
+          bracket += 1
+        } else if ch == ']' {
+          bracket -= 1
+        } else if depth == 0 && bracket == 0 && starts_with_at(chars, target, i) {
           return Some(
             (
               trim_ascii(String::from_array(chars[:i])),
-              trim_ascii(String::from_array(chars[i + 2:])),
+              trim_ascii(String::from_array(chars[i + target.length():])),
             ),
           )
         }
@@ -1218,30 +1368,64 @@ fn split_filter_and(expr : String) -> (String, String)? {
 }
 
 ///|
-fn parse_filter_field_path(input : String) -> Array[String] {
-  let fields : Array[String] = []
-  for part in split_simple(input, '.') {
-    let trimmed = trim_ascii(part)
-    if trimmed == "" {
-      return []
-    }
-    fields.push(trimmed)
+fn starts_with_at(chars : Array[Char], target : Array[Char], start : Int) -> Bool {
+  if start + target.length() > chars.length() {
+    return false
   }
-  fields
+  for i = 0; i < target.length(); i = i + 1 {
+    if chars[start + i] != target[i] {
+      return false
+    }
+  }
+  true
+}
+
+fn parse_current_path(input : String) -> Array[String]? {
+  let trimmed = trim_ascii(input)
+  if !trimmed.has_prefix("@") {
+    return None
+  }
+  if trimmed == "@" {
+    return Some([])
+  }
+  let chars = trimmed.to_array()
+  let fields : Array[String] = []
+  let mut i = 1
+  while i < chars.length() {
+    if chars[i] == '.' {
+      i += 1
+      let start = i
+      while i < chars.length() && chars[i] != '.' && chars[i] != '[' {
+        i += 1
+      }
+      if i == start {
+        return None
+      }
+      fields.push(String::from_array(chars[start:i]))
+    } else if chars[i] == '[' {
+      let end = match find_closing_bracket(chars, i) {
+        Some(end) => end
+        None => return None
+      }
+      let selector = String::from_array(chars[i + 1:end])
+      match parse_quoted_member(selector) {
+        Some(key) => fields.push(key)
+        None => return None
+      }
+      i = end + 1
+    } else {
+      return None
+    }
+  }
+  Some(fields)
 }
 
 ///|
-fn split_simple(input : String, sep : Char) -> Array[String] {
+fn copy_string_prefix(items : Array[String], len : Int) -> Array[String] {
   let out : Array[String] = []
-  let chars = input.to_array()
-  let mut start = 0
-  for i, ch in chars {
-    if ch == sep {
-      out.push(String::from_array(chars[start:i]))
-      start = i + 1
-    }
+  for i = 0; i < len; i = i + 1 {
+    out.push(items[i])
   }
-  out.push(String::from_array(chars[start:chars.length()]))
   out
 }
 
@@ -1261,6 +1445,49 @@ fn find_operator(input : String, op : String) -> Int? {
     }
     if same {
       return Some(i)
+    }
+  }
+  None
+}
+
+///|
+fn find_word_operator(input : String, op : String) -> Int? {
+  let chars = input.to_array()
+  let target = op.to_array()
+  let mut quote : Char? = None
+  let mut escaped = false
+  let mut depth = 0
+  let mut bracket = 0
+  for i = 0; i < chars.length(); i = i + 1 {
+    let ch = chars[i]
+    match quote {
+      Some(q) =>
+        if escaped {
+          escaped = false
+        } else if ch == '\\' {
+          escaped = true
+        } else if ch == q {
+          quote = None
+        }
+      None =>
+        if ch == '\'' || ch == '"' {
+          quote = Some(ch)
+        } else if ch == '(' {
+          depth += 1
+        } else if ch == ')' {
+          depth -= 1
+        } else if ch == '[' {
+          bracket += 1
+        } else if ch == ']' {
+          bracket -= 1
+        } else if depth == 0 && bracket == 0 && starts_with_at(chars, target, i) {
+          let before_ok = i == 0 || is_ascii_space(chars[i - 1])
+          let after = i + target.length()
+          let after_ok = after >= chars.length() || is_ascii_space(chars[after])
+          if before_ok && after_ok {
+            return Some(i)
+          }
+        }
     }
   }
   None
@@ -1357,8 +1584,24 @@ fn filter_matches(value : Json, filter : FilterExpr) -> Bool {
         Some(field_value) => compare_json_literal(field_value, op, literal)
         None => false
       }
+    StringMatch(path, op, needle) =>
+      match resolve_filter_path(value, path) {
+        Some(String(actual)) => match_string_op(actual, op, needle)
+        _ => false
+      }
+    LengthCompare(path, op, literal) =>
+      match (resolve_filter_path(value, path), literal) {
+        (Some(Array(array)), LNumber(expected)) =>
+          compare_double(array.length().to_double(), op, expected)
+        (Some(String(text)), LNumber(expected)) =>
+          compare_double(text.length().to_double(), op, expected)
+        _ => false
+      }
     And(left, right) =>
       filter_matches(value, left) && filter_matches(value, right)
+    Or(left, right) =>
+      filter_matches(value, left) || filter_matches(value, right)
+    Not(inner) => !filter_matches(value, inner)
   }
 }
 
@@ -1402,6 +1645,15 @@ fn compare_string(left : String, op : CompareOp, right : String) -> Bool {
     Eq => left == right
     Ne => left != right
     Gt | Ge | Lt | Le => false
+  }
+}
+
+///|
+fn match_string_op(left : String, op : StringOp, right : String) -> Bool {
+  match op {
+    Contains => left.contains(right)
+    StartsWith => left.has_prefix(right)
+    EndsWith => left.has_suffix(right)
   }
 }
 
