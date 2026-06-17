@@ -53,7 +53,7 @@ moon run cmd/main
 
 ## Library Example
 
-```moonbit nocheck
+```moonbit
 ///|
 test {
   let doc : Json = {
@@ -75,7 +75,7 @@ test {
 
 JSON Pointer identifies one exact location inside a JSON document.
 
-```moonbit nocheck
+```moonbit
 ///|
 test {
   let doc : Json = { "meta": { "count": 2 }, "tags": ["old"] }
@@ -135,7 +135,7 @@ $.items[?(!(@.hidden == true))]
 
 MoonJSONPath includes a lightweight pointer-based transformation layer.
 
-```moonbit nocheck
+```moonbit
 ///|
 test {
   let doc : Json = {
