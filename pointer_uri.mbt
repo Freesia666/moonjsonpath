@@ -10,14 +10,25 @@ pub fn Pointer::to_uri_fragment(self : Pointer) -> String {
 }
 
 ///|
-pub fn Pointer::parse_uri_fragment(input : String) -> Result[Pointer, PointerError] {
+pub fn Pointer::parse_uri_fragment(
+  input : String,
+) -> Result[Pointer, PointerError] {
   if !input.has_prefix("#") {
-    return Err(pointer_error(InvalidSyntax, "", "URI fragment must start with '#'"))
+    return Err(
+      pointer_error(InvalidSyntax, "", "URI fragment must start with '#'"),
+    )
   }
   let fragment = input[1:].to_owned()
   match percent_decode_to_string(fragment) {
     Some(pointer_text) => Pointer::parse(pointer_text)
-    None => Err(pointer_error(InvalidSyntax, input, "URI fragment contains invalid percent encoding"))
+    None =>
+      Err(
+        pointer_error(
+          InvalidSyntax,
+          input,
+          "URI fragment contains invalid percent encoding",
+        ),
+      )
   }
 }
 

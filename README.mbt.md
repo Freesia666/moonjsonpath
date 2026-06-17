@@ -8,6 +8,7 @@ hand-written recursive traversal code.
 
 - JSON Pointer parsing and formatting compatible with RFC 6901 escaping.
 - Pointer `get`, `set`, and `remove` operations over `Json` values.
+- JSON Pointer URI fragment helpers: `to_uri_fragment` and `parse_uri_fragment`.
 - JSONPath core query subset:
   - root selector `$`
   - dot members: `$.users`
@@ -19,11 +20,20 @@ hand-written recursive traversal code.
   - array slices: `$.items[1:4]`, `$.items[:2]`, `$.items[3:]`, `$.items[::-1]`
   - negative indexes: `$.items[-1]`
   - filters: `$.users[?(@.age > 20)]`, `?(@.isbn)`, `?(@.a == 1 && @.b)`
+  - extended filters: `||`, `!`, grouping, `contains`, `starts_with`,
+    `ends_with`, and `.length` checks
 - Match results include both the matched JSON value and its JSON Pointer path.
+- JSONPath helper APIs: `first`, `exists`, `values`, `pointers`, `explain`,
+  `segment_count`, and `is_definite`.
+- Pointer Patch operations: `add`, `replace`, `remove`, `test`,
+  `copy`, and `move`.
 - Text and file helpers for parsing JSON input and serializing query results.
+- CLI subcommands for `query`, `get`, `set`, `remove`, and `patch`.
 - CLI output modes for values, pointers, and `{ path, value }` match objects.
 - A cookbook suite of runnable scenarios covering API extraction, diagnostics,
   config keys, filters, slices, and pointer output.
+- Structured scenario, operator reference, readiness, and submission evidence
+  catalogs that can generate contest-facing Markdown.
 
 ## Quick Start
 
@@ -54,9 +64,13 @@ test {
 The command can be run from the project root:
 
 ```bash
-moon run cmd/main -- '$.users[*].name' data.json
-moon run cmd/main -- --pointers '$..name' data.json
-moon run cmd/main -- --matches --pretty '$.users[?(@.age > 20)]' data.json
+moon run cmd/main -- query '$.users[*].name' data.json
+moon run cmd/main -- query --pointers '$..name' data.json
+moon run cmd/main -- query --matches --pretty '$.users[?(@.age > 20)]' data.json
+moon run cmd/main -- get '/users/0/name' data.json
+moon run cmd/main -- set '/users/0/active' true data.json
+moon run cmd/main -- remove '/users/0/secret' data.json
+moon run cmd/main -- patch patch.json data.json
 ```
 
 For a file containing two users named Ada and Grace, the first command prints:
@@ -89,6 +103,20 @@ and LLM/tool-call workflows.
 The package includes `cookbook_entries()`, `run_cookbook()`, and
 `cookbook_markdown()` for examples that double as regression coverage. These
 examples are useful when preparing a submission demo or README excerpt.
+
+It also includes structured documentation data sources:
+
+- `scenario_catalog_markdown()`
+- `operator_reference_markdown()`
+- `submission_evidence_markdown()`
+- `readiness_matrix_markdown()`
+- `longform_handbook()`
+
+## Project Scale
+
+The current MoonBit source scale is just over 7k lines, including library code,
+CLI support, conformance-style tests, workflow catalogs, and contest-facing
+documentation generators.
 
 ## Contest Notes
 

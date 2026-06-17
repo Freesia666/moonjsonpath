@@ -44,10 +44,7 @@ fn catalog_doc() -> Json {
           "available": true,
         },
       ],
-      "bicycle": {
-        "color": "red",
-        "price": 19.95,
-      },
+      "bicycle": { "color": "red", "price": 19.95 },
     },
     "meta": {
       "count": 4,
@@ -63,43 +60,45 @@ fn catalog_cases() -> Array[CatalogCase] {
     {
       name: "root store",
       query: "$.store",
-      values: [{
-        "book": [
-          {
-            "category": "reference",
-            "author": "Nigel",
-            "title": "Sayings",
-            "price": 8.95,
-            "tags": ["classic", "quote"],
-            "available": true,
-          },
-          {
-            "category": "fiction",
-            "author": "Evelyn",
-            "title": "Sword",
-            "price": 12.99,
-            "tags": ["fiction"],
-            "available": false,
-          },
-          {
-            "category": "fiction",
-            "author": "Herman",
-            "title": "Moby",
-            "price": 8.99,
-            "tags": ["fiction", "sea"],
-            "available": true,
-          },
-          {
-            "category": "fiction",
-            "author": "Tolkien",
-            "title": "Ring",
-            "price": 22.99,
-            "tags": ["fiction", "fantasy", "classic"],
-            "available": true,
-          },
-        ],
-        "bicycle": { "color": "red", "price": 19.95 },
-      }],
+      values: [
+        {
+          "book": [
+            {
+              "category": "reference",
+              "author": "Nigel",
+              "title": "Sayings",
+              "price": 8.95,
+              "tags": ["classic", "quote"],
+              "available": true,
+            },
+            {
+              "category": "fiction",
+              "author": "Evelyn",
+              "title": "Sword",
+              "price": 12.99,
+              "tags": ["fiction"],
+              "available": false,
+            },
+            {
+              "category": "fiction",
+              "author": "Herman",
+              "title": "Moby",
+              "price": 8.99,
+              "tags": ["fiction", "sea"],
+              "available": true,
+            },
+            {
+              "category": "fiction",
+              "author": "Tolkien",
+              "title": "Ring",
+              "price": 22.99,
+              "tags": ["fiction", "fantasy", "classic"],
+              "available": true,
+            },
+          ],
+          "bicycle": { "color": "red", "price": 19.95 },
+        },
+      ],
       pointers: ["/store"],
     },
     {
@@ -107,10 +106,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$.store.book[*].author",
       values: ["Nigel", "Evelyn", "Herman", "Tolkien"],
       pointers: [
-        "/store/book/0/author",
-        "/store/book/1/author",
-        "/store/book/2/author",
-        "/store/book/3/author",
+        "/store/book/0/author", "/store/book/1/author", "/store/book/2/author", "/store/book/3/author",
       ],
     },
     {
@@ -154,10 +150,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$.store.book[::-1].title",
       values: ["Ring", "Moby", "Sword", "Sayings"],
       pointers: [
-        "/store/book/3/title",
-        "/store/book/2/title",
-        "/store/book/1/title",
-        "/store/book/0/title",
+        "/store/book/3/title", "/store/book/2/title", "/store/book/1/title", "/store/book/0/title",
       ],
     },
     {
@@ -213,10 +206,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$..price",
       values: [8.95, 12.99, 8.99, 22.99, 19.95],
       pointers: [
-        "/store/book/0/price",
-        "/store/book/1/price",
-        "/store/book/2/price",
-        "/store/book/3/price",
+        "/store/book/0/price", "/store/book/1/price", "/store/book/2/price", "/store/book/3/price",
         "/store/bicycle/price",
       ],
     },
@@ -225,9 +215,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$.store.book[?(@.category == \"fiction\")].title",
       values: ["Sword", "Moby", "Ring"],
       pointers: [
-        "/store/book/1/title",
-        "/store/book/2/title",
-        "/store/book/3/title",
+        "/store/book/1/title", "/store/book/2/title", "/store/book/3/title",
       ],
     },
     {
@@ -241,9 +229,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$.store.book[?(@.available == true)].title",
       values: ["Sayings", "Moby", "Ring"],
       pointers: [
-        "/store/book/0/title",
-        "/store/book/2/title",
-        "/store/book/3/title",
+        "/store/book/0/title", "/store/book/2/title", "/store/book/3/title",
       ],
     },
     {
@@ -257,10 +243,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$.store.book[?(@.category == \"fiction\" || @.category == \"reference\")].author",
       values: ["Nigel", "Evelyn", "Herman", "Tolkien"],
       pointers: [
-        "/store/book/0/author",
-        "/store/book/1/author",
-        "/store/book/2/author",
-        "/store/book/3/author",
+        "/store/book/0/author", "/store/book/1/author", "/store/book/2/author", "/store/book/3/author",
       ],
     },
     {
@@ -292,9 +275,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$.store.book[?(@.tags.length >= 2)].title",
       values: ["Sayings", "Moby", "Ring"],
       pointers: [
-        "/store/book/0/title",
-        "/store/book/2/title",
-        "/store/book/3/title",
+        "/store/book/0/title", "/store/book/2/title", "/store/book/3/title",
       ],
     },
     {
@@ -302,10 +283,7 @@ fn catalog_cases() -> Array[CatalogCase] {
       query: "$..author",
       values: ["Nigel", "Evelyn", "Herman", "Tolkien"],
       pointers: [
-        "/store/book/0/author",
-        "/store/book/1/author",
-        "/store/book/2/author",
-        "/store/book/3/author",
+        "/store/book/0/author", "/store/book/1/author", "/store/book/2/author", "/store/book/3/author",
       ],
     },
     {
@@ -358,10 +336,7 @@ fn catalog_cases() -> Array[CatalogCase] {
         },
       ],
       pointers: [
-        "/store/book/0",
-        "/store/book/1",
-        "/store/book/2",
-        "/store/book/3",
+        "/store/book/0", "/store/book/1", "/store/book/2", "/store/book/3",
       ],
     },
     {

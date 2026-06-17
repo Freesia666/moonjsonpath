@@ -9,20 +9,26 @@ test "jsonpath filters support or not and grouped boolean expressions" {
     ],
   }
   let senior_or_compiler = @moonjsonpath.Path::compile(
-    "$.users[?(@.age >= 80 || @.role == \"compiler\")].name",
-  ).unwrap().query(doc)
+      "$.users[?(@.age >= 80 || @.role == \"compiler\")].name",
+    )
+    .unwrap()
+    .query(doc)
   @json.json_inspect(senior_or_compiler.map(item => item.value), content=[
     "Ada", "Grace", "Barbara",
   ])
 
   let active_not_docs = @moonjsonpath.Path::compile(
-    "$.users[?(@.active == true && !(@.role == \"docs\"))].name",
-  ).unwrap().query(doc)
+      "$.users[?(@.active == true && !(@.role == \"docs\"))].name",
+    )
+    .unwrap()
+    .query(doc)
   @json.json_inspect(active_not_docs.map(item => item.value), content=["Ada"])
 
   let grouped = @moonjsonpath.Path::compile(
-    "$.users[?((@.active == true || @.age > 80) && @.name != \"Katherine\")].name",
-  ).unwrap().query(doc)
+      "$.users[?((@.active == true || @.age > 80) && @.name != \"Katherine\")].name",
+    )
+    .unwrap()
+    .query(doc)
   @json.json_inspect(grouped.map(item => item.value), content=["Ada", "Grace"])
 }
 
@@ -35,8 +41,10 @@ test "jsonpath filters support quoted field names inside current node paths" {
     ],
   }
   let matches = @moonjsonpath.Path::compile(
-    "$.items[?(@['display name'] == \"MoonBit Guide\" && @.meta['build-id'] == 1)]",
-  ).unwrap().query(doc)
+      "$.items[?(@['display name'] == \"MoonBit Guide\" && @.meta['build-id'] == 1)]",
+    )
+    .unwrap()
+    .query(doc)
   inspect(matches.length(), content="1")
   inspect(matches[0].pointer.to_string(), content="/items/0")
 }
@@ -52,22 +60,28 @@ test "jsonpath filters support contains starts_with ends_with and length" {
     ],
   }
   let moonbit_sources = @moonjsonpath.Path::compile(
-    "$.files[?(@.name starts_with \"src/\" && @.name ends_with \".mbt\")].name",
-  ).unwrap().query(doc)
+      "$.files[?(@.name starts_with \"src/\" && @.name ends_with \".mbt\")].name",
+    )
+    .unwrap()
+    .query(doc)
   @json.json_inspect(moonbit_sources.map(item => item.value), content=[
     "src/main.mbt", "src/patch.mbt",
   ])
 
   let docs_or_patch = @moonjsonpath.Path::compile(
-    "$.files[?(@.name contains \"README\" || @.name contains \"patch\")].name",
-  ).unwrap().query(doc)
+      "$.files[?(@.name contains \"README\" || @.name contains \"patch\")].name",
+    )
+    .unwrap()
+    .query(doc)
   @json.json_inspect(docs_or_patch.map(item => item.value), content=[
     "README.mbt.md", "src/patch.mbt",
   ])
 
   let many_tags = @moonjsonpath.Path::compile(
-    "$.files[?(@.tags.length >= 2)].name",
-  ).unwrap().query(doc)
+      "$.files[?(@.tags.length >= 2)].name",
+    )
+    .unwrap()
+    .query(doc)
   @json.json_inspect(many_tags.map(item => item.value), content=[
     "src/main.mbt", "src/patch.mbt",
   ])

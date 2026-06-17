@@ -26,7 +26,8 @@ fn describe_path_segment(segment : PathSegment) -> String {
     Element(index) => "element \{index}"
     Wildcard => "wildcard"
     RecursiveMember(key) => "recursive member \{key}"
-    Slice(start, end, step) => "slice \{format_optional_int(start)}:\{format_optional_int(end)}\{format_optional_step(step)}"
+    Slice(start, end, step) =>
+      "slice \{format_optional_int(start)}:\{format_optional_int(end)}\{format_optional_step(step)}"
     Filter(filter) => "filter \{format_filter_for_explain(filter)}"
     Union(items) => "union \{format_union_for_explain(items)}"
   }

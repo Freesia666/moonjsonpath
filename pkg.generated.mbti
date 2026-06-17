@@ -6,11 +6,37 @@ import {
 }
 
 // Values
+pub fn apply_patch(Json, Array[PatchOp]) -> Result[Json, PatchError]
+
+pub fn cli_command_usage() -> String
+
 pub fn cli_usage() -> String
 
 pub fn cookbook_entries() -> Array[CookbookEntry]
 
 pub fn cookbook_markdown() -> String
+
+pub fn execute_cli_text(CliCommand, String, String) -> Result[String, String]
+
+pub fn handbook_submission_supplement() -> String
+
+pub fn longform_handbook() -> String
+
+pub fn operator_reference() -> Array[OperatorReference]
+
+pub fn operator_reference_markdown() -> String
+
+pub fn patch_json_text(String, String, indent? : Int) -> Result[String, String]
+
+pub fn pointer_get_json_text(String, String, indent? : Int) -> Result[String, String]
+
+pub fn pointer_remove_json_text(String, String, indent? : Int) -> Result[String, String]
+
+pub fn pointer_set_json_text(String, String, String, indent? : Int) -> Result[String, String]
+
+pub fn query_exists_json_text(String, String) -> Result[Bool, String]
+
+pub fn query_first_json_text(String, String, indent? : Int) -> Result[String, String]
 
 pub fn query_json_file(String, String) -> Result[String, String]
 
@@ -20,13 +46,59 @@ pub fn query_json_text(String, String) -> Result[String, String]
 
 pub fn query_json_text_with_options(String, String, QueryOptions) -> Result[String, String]
 
+pub fn query_pointers_json_text(String, String, indent? : Int) -> Result[String, String]
+
+pub fn query_values_json_text(String, String, indent? : Int) -> Result[String, String]
+
+pub fn readiness_count_by_status(String) -> Int
+
+pub fn readiness_matrix() -> Array[ReadinessItem]
+
+pub fn readiness_matrix_markdown() -> String
+
 pub fn run_cli(Array[String]) -> Int
 
+pub fn run_cli_command(Array[String]) -> Int
+
 pub fn run_cookbook() -> Array[CookbookResult]
+
+pub fn scenario_catalog() -> Array[Scenario]
+
+pub fn scenario_catalog_markdown() -> String
+
+pub fn scenario_count_by_domain(String) -> Int
+
+pub fn submission_evidence() -> Array[EvidenceItem]
+
+pub fn submission_evidence_count(String) -> Int
+
+pub fn submission_evidence_markdown() -> String
 
 // Errors
 
 // Types and methods
+pub(all) struct CliCommand {
+  kind : CliCommandKind
+  path_text : String
+  pointer_text : String
+  value_text : String
+  patch_file_path : String
+  file_path : String
+  output : OutputMode
+  indent : Int
+} derive(Eq, @debug.Debug)
+pub fn CliCommand::parse(Array[String]) -> Result[Self, String]
+
+pub(all) enum CliCommandKind {
+  Query
+  PointerGet
+  PointerSet
+  PointerRemove
+  Patch
+  Help
+} derive(Eq, @debug.Debug)
+pub fn CliCommandKind::to_string(Self) -> String
+
 pub(all) struct CliConfig {
   path_text : String
   file_path : String
@@ -63,10 +135,21 @@ pub(all) struct CookbookResult {
   passed : Bool
 } derive(Eq, @debug.Debug)
 
+pub(all) struct EvidenceItem {
+  area : String
+  claim : String
+  evidence : String
+  command : String
+} derive(Eq, @debug.Debug)
+
 pub(all) enum FilterExpr {
   Exists(Array[String])
   Compare(Array[String], CompareOp, Literal)
+  StringMatch(Array[String], StringOp, String)
+  LengthCompare(Array[String], CompareOp, Literal)
   And(FilterExpr, FilterExpr)
+  Or(FilterExpr, FilterExpr)
+  Not(FilterExpr)
 } derive(Eq, @debug.Debug)
 
 pub(all) enum Literal {
@@ -76,18 +159,65 @@ pub(all) enum Literal {
   LNull
 } derive(Eq, @debug.Debug)
 
+pub(all) struct OperatorReference {
+  group : String
+  syntax : String
+  example : String
+  description : String
+  rfc_note : String
+} derive(Eq, @debug.Debug)
+
 pub(all) enum OutputMode {
   Values
   Pointers
   Matches
 } derive(Eq, @debug.Debug)
+pub fn OutputMode::to_string(Self) -> String
+
+pub(all) struct PatchError {
+  index : Int
+  path : String
+  message : String
+} derive(Eq, @debug.Debug)
+pub fn PatchError::describe(Self) -> String
+
+pub(all) enum PatchKind {
+  Add
+  Replace
+  Remove
+  AssertValue
+  Copy
+  MoveValue
+} derive(Eq, @debug.Debug)
+
+pub(all) struct PatchOp {
+  kind : PatchKind
+  path : String
+  value : Json?
+  from : String?
+} derive(Eq, @debug.Debug)
+pub fn PatchOp::add(String, Json) -> Self
+pub fn PatchOp::assert_value(String, Json) -> Self
+pub fn PatchOp::copy(String, String) -> Self
+pub fn PatchOp::move_to(String, String) -> Self
+pub fn PatchOp::parse(Json) -> Result[Self, String]
+pub fn PatchOp::parse_many(Json) -> Result[Array[Self], String]
+pub fn PatchOp::remove(String) -> Self
+pub fn PatchOp::replace(String, Json) -> Self
 
 pub(all) struct Path {
   segments : Array[PathSegment]
 } derive(Eq, @debug.Debug)
 pub fn Path::compile(String) -> Result[Self, PathError]
+pub fn Path::exists(Self, Json) -> Bool
+pub fn Path::explain(Self) -> Array[String]
+pub fn Path::first(Self, Json) -> Json?
+pub fn Path::is_definite(Self) -> Bool
+pub fn Path::pointers(Self, Json) -> Json
 pub fn Path::query(Self, Json) -> Array[PathMatch]
+pub fn Path::segment_count(Self) -> Int
 pub fn Path::to_string(Self) -> String
+pub fn Path::values(Self, Json) -> Json
 
 pub(all) struct PathError {
   position : Int
@@ -115,9 +245,11 @@ pub(all) struct Pointer {
 } derive(Eq, @debug.Debug)
 pub fn Pointer::get(Self, Json) -> Result[Json, PointerError]
 pub fn Pointer::parse(String) -> Result[Self, PointerError]
+pub fn Pointer::parse_uri_fragment(String) -> Result[Self, PointerError]
 pub fn Pointer::remove(Self, Json) -> Result[Json, PointerError]
 pub fn Pointer::set(Self, Json, Json) -> Result[Json, PointerError]
 pub fn Pointer::to_string(Self) -> String
+pub fn Pointer::to_uri_fragment(Self) -> String
 pub fn Pointer::tokens(Self) -> Array[String]
 
 pub(all) struct PointerError {
@@ -141,6 +273,29 @@ pub(all) struct QueryOptions {
 pub fn QueryOptions::matches(indent? : Int) -> Self
 pub fn QueryOptions::pointers(indent? : Int) -> Self
 pub fn QueryOptions::values(indent? : Int) -> Self
+
+pub(all) struct ReadinessItem {
+  category : String
+  item : String
+  status : String
+  evidence : String
+  next_step : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Scenario {
+  title : String
+  domain : String
+  query : String
+  pointer : String
+  cli : String
+  note : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum StringOp {
+  Contains
+  StartsWith
+  EndsWith
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

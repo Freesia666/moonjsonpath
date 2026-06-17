@@ -1252,7 +1252,13 @@ fn parse_filter_expr(expr : String) -> FilterExpr? {
         match (parse_current_path(left), parse_literal(right)) {
           (Some(fields), Some(literal)) =>
             if fields.length() > 0 && fields[fields.length() - 1] == "length" {
-              return Some(LengthCompare(copy_string_prefix(fields, fields.length() - 1), op, literal))
+              return Some(
+                LengthCompare(
+                  copy_string_prefix(fields, fields.length() - 1),
+                  op,
+                  literal,
+                ),
+              )
             } else {
               return Some(Compare(fields, op, literal))
             }
@@ -1264,10 +1270,7 @@ fn parse_filter_expr(expr : String) -> FilterExpr? {
   }
   let trimmed = trim_ascii(expr)
   match parse_current_path(trimmed) {
-    Some(fields) =>
-      if fields.length() > 0 {
-        return Some(Exists(fields))
-      }
+    Some(fields) => if fields.length() > 0 { return Some(Exists(fields)) }
     None => ()
   }
   None
@@ -1280,7 +1283,9 @@ fn strip_wrapping_parens(input : String) -> String {
   while changed {
     changed = false
     let chars = current.to_array()
-    if chars.length() >= 2 && chars[0] == '(' && chars[chars.length() - 1] == ')' {
+    if chars.length() >= 2 &&
+      chars[0] == '(' &&
+      chars[chars.length() - 1] == ')' {
       match matching_outer_parens(chars) {
         true => {
           current = trim_ascii(String::from_array(chars[1:chars.length() - 1]))
@@ -1368,7 +1373,11 @@ fn split_filter_binary(expr : String, op : String) -> (String, String)? {
 }
 
 ///|
-fn starts_with_at(chars : Array[Char], target : Array[Char], start : Int) -> Bool {
+fn starts_with_at(
+  chars : Array[Char],
+  target : Array[Char],
+  start : Int,
+) -> Bool {
   if start + target.length() > chars.length() {
     return false
   }
@@ -1380,6 +1389,7 @@ fn starts_with_at(chars : Array[Char], target : Array[Char], start : Int) -> Boo
   true
 }
 
+///|
 fn parse_current_path(input : String) -> Array[String]? {
   let trimmed = trim_ascii(input)
   if !trimmed.has_prefix("@") {

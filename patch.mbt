@@ -61,7 +61,8 @@ pub fn PatchOp::parse_many(doc : Json) -> Result[Array[PatchOp], String] {
       for index, item in items {
         match PatchOp::parse(item) {
           Ok(op) => ops.push(op)
-          Err(message) => return Err("invalid patch operation \{index}: \{message}")
+          Err(message) =>
+            return Err("invalid patch operation \{index}: \{message}")
         }
       }
       Ok(ops)
@@ -121,13 +122,15 @@ pub fn PatchError::describe(self : PatchError) -> String {
 }
 
 ///|
-pub fn apply_patch(doc : Json, ops : Array[PatchOp]) -> Result[Json, PatchError] {
+pub fn apply_patch(
+  doc : Json,
+  ops : Array[PatchOp],
+) -> Result[Json, PatchError] {
   let mut current = doc
   for index, op in ops {
     match apply_patch_op(current, op) {
       Ok(next) => current = next
-      Err(message) =>
-        return Err({ index, path: patch_error_path(op), message })
+      Err(message) => return Err({ index, path: patch_error_path(op), message })
     }
   }
   Ok(current)
@@ -199,7 +202,8 @@ fn apply_patch_op(doc : Json, op : PatchOp) -> Result[Json, String] {
               match from_pointer.get(doc) {
                 Ok(value) =>
                   match from_pointer.remove(doc) {
-                    Ok(without_source) => pointer_add(op.path, without_source, value)
+                    Ok(without_source) =>
+                      pointer_add(op.path, without_source, value)
                     Err(err) => Err(err.message)
                   }
                 Err(err) => Err(err.message)
@@ -268,7 +272,7 @@ fn add_at(
         }
       }
     }
-    Array(array) => {
+    Array(array) =>
       if last {
         match insertion_index(part, array.length()) {
           Some(index) => Ok(Json::array(insert_json(array, index, value)))
@@ -288,7 +292,6 @@ fn add_at(
           None => Err("array index is out of bounds")
         }
       }
-    }
     _ => Err("cannot descend into a scalar JSON value")
   }
 }
@@ -299,12 +302,7 @@ fn insertion_index(token : String, len : Int) -> Int? {
     return Some(len)
   }
   match parse_patch_index(token, len + 1) {
-    Some(index) =>
-      if index <= len {
-        Some(index)
-      } else {
-        None
-      }
+    Some(index) => if index <= len { Some(index) } else { None }
     None => None
   }
 }
@@ -312,12 +310,7 @@ fn insertion_index(token : String, len : Int) -> Int? {
 ///|
 fn parse_patch_index(token : String, len : Int) -> Int? {
   match parse_array_index(token) {
-    Some(index) =>
-      if index >= 0 && index < len {
-        Some(index)
-      } else {
-        None
-      }
+    Some(index) => if index >= 0 && index < len { Some(index) } else { None }
     None => None
   }
 }

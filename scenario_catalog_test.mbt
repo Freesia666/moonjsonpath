@@ -2,8 +2,14 @@
 test "scenario catalog exposes many documented workflows" {
   let scenarios = @moonjsonpath.scenario_catalog()
   inspect(scenarios.length() >= 50, content="true")
-  inspect(@moonjsonpath.scenario_count_by_domain("identity") >= 10, content="true")
-  inspect(@moonjsonpath.scenario_count_by_domain("configuration") >= 10, content="true")
+  inspect(
+    @moonjsonpath.scenario_count_by_domain("identity") >= 10,
+    content="true",
+  )
+  inspect(
+    @moonjsonpath.scenario_count_by_domain("configuration") >= 10,
+    content="true",
+  )
   inspect(@moonjsonpath.scenario_count_by_domain("ai") >= 3, content="true")
 }
 

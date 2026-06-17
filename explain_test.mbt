@@ -4,19 +4,16 @@ test "path explain describes segments and definiteness" {
   inspect(definite.segment_count(), content="3")
   inspect(definite.is_definite(), content="true")
   @json.json_inspect(definite.explain(), content=[
-    "member users",
-    "element 0",
-    "member name",
+    "member users", "element 0", "member name",
   ])
 
-  let plural = @moonjsonpath.Path::compile("$.users[*][?(@.active == true)].name").unwrap()
+  let plural = @moonjsonpath.Path::compile(
+    "$.users[*][?(@.active == true)].name",
+  ).unwrap()
   inspect(plural.segment_count(), content="4")
   inspect(plural.is_definite(), content="false")
   @json.json_inspect(plural.explain(), content=[
-    "member users",
-    "wildcard",
-    "filter @.active == true",
-    "member name",
+    "member users", "wildcard", "filter @.active == true", "member name",
   ])
 }
 
@@ -28,9 +25,6 @@ test "path explain covers recursive slice union and extended filters" {
   inspect(path.segment_count(), content="4")
   inspect(path.is_definite(), content="false")
   @json.json_inspect(path.explain(), content=[
-    "recursive member items",
-    "slice 1:5:2",
-    "union ['name','title']",
-    "filter @.label contains \"Moon\" || !(@.hidden == true)",
+    "recursive member items", "slice 1:5:2", "union ['name','title']", "filter @.label contains \"Moon\" || !(@.hidden == true)",
   ])
 }

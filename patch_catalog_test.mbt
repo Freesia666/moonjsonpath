@@ -136,13 +136,7 @@ fn patch_catalog_cases() -> Array[PatchCatalogCase] {
     },
     {
       name: "normalize user fields",
-      doc: {
-        "user": {
-          "first": "Ada",
-          "last": "Lovelace",
-          "display": "",
-        },
-      },
+      doc: { "user": { "first": "Ada", "last": "Lovelace", "display": "" } },
       ops: [
         @moonjsonpath.PatchOp::replace("/user/display", "Ada Lovelace"),
         @moonjsonpath.PatchOp::remove("/user/first"),
@@ -256,20 +250,16 @@ test "patch catalog cases apply expected transformations" {
 
 ///|
 test "patch catalog error cases include operation indexes" {
-  let bad_test = @moonjsonpath.apply_patch(
-    { "x": 1 },
-    [@moonjsonpath.PatchOp::assert_value("/x", 2)],
-  )
+  let bad_test = @moonjsonpath.apply_patch({ "x": 1 }, [
+    @moonjsonpath.PatchOp::assert_value("/x", 2),
+  ])
   inspect(bad_test is Err(_), content="true")
   inspect(bad_test.unwrap_err().index, content="0")
 
-  let bad_second = @moonjsonpath.apply_patch(
-    { "x": 1 },
-    [
-      @moonjsonpath.PatchOp::replace("/x", 2),
-      @moonjsonpath.PatchOp::replace("/missing/value", 3),
-    ],
-  )
+  let bad_second = @moonjsonpath.apply_patch({ "x": 1 }, [
+    @moonjsonpath.PatchOp::replace("/x", 2),
+    @moonjsonpath.PatchOp::replace("/missing/value", 3),
+  ])
   inspect(bad_second is Err(_), content="true")
   inspect(bad_second.unwrap_err().index, content="1")
   inspect(bad_second.unwrap_err().path, content="/missing/value")

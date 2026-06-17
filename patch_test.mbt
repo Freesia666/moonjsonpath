@@ -69,7 +69,10 @@ test "patch reports failing operation index and path" {
   let err = result.unwrap_err()
   inspect(err.index, content="0")
   inspect(err.path, content="/active")
-  inspect(err.describe(), content="patch operation 0 failed at /active: test operation did not match")
+  inspect(
+    err.describe(),
+    content="patch operation 0 failed at /active: test operation did not match",
+  )
 }
 
 ///|

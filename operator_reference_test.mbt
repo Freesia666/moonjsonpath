@@ -28,7 +28,10 @@ test "operator reference JSONPath examples compile when applicable" {
 }
 
 ///|
-fn count_group(refs : Array[@moonjsonpath.OperatorReference], group : String) -> Int {
+fn count_group(
+  refs : Array[@moonjsonpath.OperatorReference],
+  group : String,
+) -> Int {
   let mut count = 0
   for item in refs {
     if item.group == group {

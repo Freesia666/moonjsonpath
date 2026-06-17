@@ -53,8 +53,7 @@ pub fn CliCommand::parse(args : Array[String]) -> Result[CliCommand, String] {
   while i < args.length() {
     let arg = args[i]
     match arg {
-      "--help" | "-h" =>
-        return Ok(make_help_command())
+      "--help" | "-h" => return Ok(make_help_command())
       "--values" => {
         output = Values
         i += 1
@@ -227,13 +226,16 @@ pub fn execute_cli_text(
 ) -> Result[String, String] {
   match command.kind {
     Query =>
-      query_json_text_with_options(
-        command.path_text,
-        json_text,
-        { output: command.output, indent: command.indent },
-      )
+      query_json_text_with_options(command.path_text, json_text, {
+        output: command.output,
+        indent: command.indent,
+      })
     PointerGet =>
-      pointer_get_json_text(command.pointer_text, json_text, indent=command.indent)
+      pointer_get_json_text(
+        command.pointer_text,
+        json_text,
+        indent=command.indent,
+      )
     PointerSet =>
       pointer_set_json_text(
         command.pointer_text,
@@ -242,7 +244,11 @@ pub fn execute_cli_text(
         indent=command.indent,
       )
     PointerRemove =>
-      pointer_remove_json_text(command.pointer_text, json_text, indent=command.indent)
+      pointer_remove_json_text(
+        command.pointer_text,
+        json_text,
+        indent=command.indent,
+      )
     Patch => patch_json_text(patch_text, json_text, indent=command.indent)
     Help => Ok(cli_command_usage())
   }

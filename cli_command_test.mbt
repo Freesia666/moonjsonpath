@@ -69,16 +69,25 @@ test "cli command executes against provided text inputs" {
   let query = @moonjsonpath.CliCommand::parse([
     "moonjsonpath", "query", "$.users[*].name", "data.json",
   ]).unwrap()
-  inspect(@moonjsonpath.execute_cli_text(query, doc, "").unwrap(), content="[\"Ada\",\"Grace\"]")
+  inspect(
+    @moonjsonpath.execute_cli_text(query, doc, "").unwrap(),
+    content="[\"Ada\",\"Grace\"]",
+  )
 
   let set = @moonjsonpath.CliCommand::parse([
     "moonjsonpath", "set", "/active", "true", "data.json",
   ]).unwrap()
-  inspect(@moonjsonpath.execute_cli_text(set, doc, "").unwrap(), content="{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}],\"active\":true}")
+  inspect(
+    @moonjsonpath.execute_cli_text(set, doc, "").unwrap(),
+    content="{\"users\":[{\"name\":\"Ada\"},{\"name\":\"Grace\"}],\"active\":true}",
+  )
 
   let patch = @moonjsonpath.CliCommand::parse([
     "moonjsonpath", "patch", "patch.json", "data.json",
   ]).unwrap()
   let patch_text = "[{\"op\":\"remove\",\"path\":\"/users/0\"}]"
-  inspect(@moonjsonpath.execute_cli_text(patch, doc, patch_text).unwrap(), content="{\"users\":[{\"name\":\"Grace\"}],\"active\":false}")
+  inspect(
+    @moonjsonpath.execute_cli_text(patch, doc, patch_text).unwrap(),
+    content="{\"users\":[{\"name\":\"Grace\"}],\"active\":false}",
+  )
 }

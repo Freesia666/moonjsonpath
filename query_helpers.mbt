@@ -30,7 +30,7 @@ pub fn query_first_json_text(
   match parse_query_inputs(path_text, json_text) {
     Ok((path, doc)) =>
       match path.first(doc) {
-        Some(value) => Ok(value.stringify(indent=indent))
+        Some(value) => Ok(value.stringify(indent~))
         None => Ok("null")
       }
     Err(message) => Err(message)
@@ -44,7 +44,7 @@ pub fn query_values_json_text(
   indent? : Int = 0,
 ) -> Result[String, String] {
   match parse_query_inputs(path_text, json_text) {
-    Ok((path, doc)) => Ok(path.values(doc).stringify(indent=indent))
+    Ok((path, doc)) => Ok(path.values(doc).stringify(indent~))
     Err(message) => Err(message)
   }
 }
@@ -56,7 +56,7 @@ pub fn query_pointers_json_text(
   indent? : Int = 0,
 ) -> Result[String, String] {
   match parse_query_inputs(path_text, json_text) {
-    Ok((path, doc)) => Ok(path.pointers(doc).stringify(indent=indent))
+    Ok((path, doc)) => Ok(path.pointers(doc).stringify(indent~))
     Err(message) => Err(message)
   }
 }
