@@ -9,13 +9,13 @@
 //   "moonbitlang/x@0.4.6",
 // }
 
-name = "RunnerQuan/moonjsonpath"
+name = "Freesia666/moonjsonpath"
 
 version = "0.1.0"
 
 readme = "README.mbt.md"
 
-repository = ""
+repository = "https://github.com/Freesia666/moonjsonpath"
 
 license = "Apache-2.0"
 

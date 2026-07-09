@@ -1,5 +1,5 @@
 import {
-  "RunnerQuan/moonjsonpath",
+  "Freesia666/moonjsonpath",
   "moonbitlang/x/sys",
 }
 
